@@ -72,7 +72,7 @@ jobs:
 
           # ── Resend payload ───────────────────────────────────────────────────
           payload = {
-              "from":    "Claude Reports <reports@yourdomain.com>",  # ← your verified Resend sender
+              "from":    "Claude Reports <me@infinitywave.design>",  # ← your verified Resend sender
               "to":      ["me@allisterantosik.com"],
               "subject": f"Daily News Report \u2014 {run_date}",
               "html":    html,
