@@ -45,8 +45,10 @@ jobs:
           echo "" >> /tmp/final_prompt.txt
           echo "---" >> /tmp/final_prompt.txt
           echo "ADDITIONAL INSTRUCTIONS:" >> /tmp/final_prompt.txt
-          echo "- For Hacker News: use WebFetch on https://news.ycombinator.com/best to get the page content, then extract individual story links in the format https://news.ycombinator.com/item?id=XXXXXXX. Do NOT link to news.ycombinator.com/front. Each HN item must link to its specific item page." >> /tmp/final_prompt.txt
-          echo "- When you have finished all research and compilation, write your COMPLETE formatted output to /tmp/news_output.md using Bash(cat > /tmp/news_output.md). This file is what gets emailed — it must contain the full briefing." >> /tmp/final_prompt.txt
+          echo "- Every story headline MUST be a markdown link: [Headline text](https://direct-article-url). Never use a bare URL as a bullet point — the URL must always be embedded in the headline itself." >> /tmp/final_prompt.txt
+          echo "- For Hacker News: use WebFetch on https://news.ycombinator.com/best to get page content, then extract individual story links in the format https://news.ycombinator.com/item?id=XXXXXXX. Do NOT link to news.ycombinator.com/front or the homepage." >> /tmp/final_prompt.txt
+          echo "- Never use **bold** markers inside section headings (### or ##). Only use plain text for headings." >> /tmp/final_prompt.txt
+          echo "- When you have finished all research and compilation, write your COMPLETE formatted output to /tmp/news_output.md using Bash. This file is what gets emailed — it must contain the full briefing." >> /tmp/final_prompt.txt
 
       # ── 3. Run Claude with the augmented prompt ──────────────────────────────
       - name: Run Claude Code
@@ -133,39 +135,53 @@ jobs:
 
           # ── Convert markdown to clean minimal HTML ────────────────────────────
           def md_inline(text):
-              """Convert inline markdown: bold, italic, and [text](url) links."""
-              # Links first — before escaping
+              """Convert inline markdown: bold, italic, bare URLs, and [text](url) links."""
+              # Named links: [text](url)
               text = re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)',
                             r'<a href="\2" style="color:#000;text-decoration:underline;">\1</a>', text)
+              # Bare URLs not already inside an href
+              text = re.sub(r'(?<!["\(])(https?://[^\s<>"]+)',
+                            r'<a href="\1" style="color:#555;text-decoration:underline;">\1</a>', text)
+              # Bold **text** — must come after URL handling
               text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+              # Italic *text*
               text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
               return text
 
           def esc(line):
-              return line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+              return (line
+                      .replace("&", "&amp;")
+                      .replace("<", "&lt;")
+                      .replace(">", "&gt;"))
 
           html_lines = []
           in_list = False
           for line in output.split("\n"):
-              # Headings — escape first, then apply inline (no links in headings usually)
+              stripped = line.strip()
+
               if line.startswith("### "):
                   if in_list: html_lines.append("</ul>"); in_list = False
-                  html_lines.append(f'<h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#888;margin:28px 0 8px;">{esc(line[4:])}</h3>')
+                  # Strip ** from section titles before rendering
+                  title = re.sub(r'\*\*(.+?)\*\*', r'\1', line[4:])
+                  html_lines.append(f'<h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#999;margin:28px 0 8px 0;">{esc(title)}</h3>')
               elif line.startswith("## "):
                   if in_list: html_lines.append("</ul>"); in_list = False
-                  html_lines.append(f'<h2 style="font-size:16px;font-weight:600;color:#111;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid #eee;">{esc(line[3:])}</h2>')
+                  title = re.sub(r'\*\*(.+?)\*\*', r'\1', line[3:])
+                  html_lines.append(f'<h2 style="font-size:15px;font-weight:600;color:#111;margin:28px 0 8px 0;padding-bottom:6px;border-bottom:1px solid #eee;">{esc(title)}</h2>')
               elif line.startswith("# "):
                   if in_list: html_lines.append("</ul>"); in_list = False
-                  html_lines.append(f'<h1 style="font-size:18px;font-weight:700;color:#000;margin:36px 0 12px;">{esc(line[2:])}</h1>')
+                  title = re.sub(r'\*\*(.+?)\*\*', r'\1', line[2:])
+                  html_lines.append(f'<h1 style="font-size:17px;font-weight:700;color:#000;margin:32px 0 10px 0;">{esc(title)}</h1>')
               elif line.startswith("- ") or line.startswith("* "):
-                  if not in_list: html_lines.append('<ul style="margin:6px 0 12px;padding-left:18px;">'); in_list = True
-                  html_lines.append(f'<li style="margin:4px 0;color:#444;">{md_inline(esc(line[2:]))}</li>')
-              elif line.strip() == "":
+                  if not in_list: html_lines.append('<ul style="margin:4px 0 10px;padding-left:16px;list-style:none;">'); in_list = True
+                  inner = md_inline(esc(line[2:]))
+                  html_lines.append(f'<li style="margin:3px 0;color:#444;padding-left:0;">{inner}</li>')
+              elif stripped == "" or stripped == "---":
                   if in_list: html_lines.append("</ul>"); in_list = False
-                  html_lines.append('<div style="height:8px;"></div>')
+                  if stripped == "": html_lines.append('<div style="height:6px;"></div>')
               else:
                   if in_list: html_lines.append("</ul>"); in_list = False
-                  html_lines.append(f'<p style="margin:0 0 10px;color:#333;line-height:1.6;">{md_inline(esc(line))}</p>')
+                  html_lines.append(f'<p style="margin:0 0 8px;color:#333;line-height:1.6;">{md_inline(esc(line))}</p>')
 
           if in_list:
               html_lines.append("</ul>")
