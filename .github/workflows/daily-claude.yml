@@ -44,11 +44,16 @@ jobs:
           cat prompt.txt > /tmp/final_prompt.txt
           echo "" >> /tmp/final_prompt.txt
           echo "---" >> /tmp/final_prompt.txt
-          echo "ADDITIONAL INSTRUCTIONS:" >> /tmp/final_prompt.txt
-          echo "- Every story headline MUST be a markdown link: [Headline text](https://direct-article-url). Never use a bare URL as a bullet point — the URL must always be embedded in the headline itself." >> /tmp/final_prompt.txt
-          echo "- For Hacker News: use WebFetch on https://news.ycombinator.com/best to get page content, then extract individual story links in the format https://news.ycombinator.com/item?id=XXXXXXX. Do NOT link to news.ycombinator.com/front or the homepage." >> /tmp/final_prompt.txt
-          echo "- Never use **bold** markers inside section headings (### or ##). Only use plain text for headings." >> /tmp/final_prompt.txt
-          echo "- When you have finished all research and compilation, write your COMPLETE formatted output to /tmp/news_output.md using Bash. This file is what gets emailed — it must contain the full briefing." >> /tmp/final_prompt.txt
+          echo "FORMATTING INSTRUCTIONS (strictly follow these):" >> /tmp/final_prompt.txt
+          echo "- Format each story like this exactly:" >> /tmp/final_prompt.txt
+          echo "  **[Story headline here](https://direct-article-url)**" >> /tmp/final_prompt.txt
+          echo "  - **Source**: Publication name" >> /tmp/final_prompt.txt
+          echo "  - **Context**: One sentence explanation." >> /tmp/final_prompt.txt
+          echo "- The headline MUST always be a clickable markdown link [text](url). A story with no URL must be omitted entirely." >> /tmp/final_prompt.txt
+          echo "- Use ## for section headings (World News, Technology, Hacker News). Never use ### for story titles." >> /tmp/final_prompt.txt
+          echo "- Never use **bold** markers inside ## section headings. Plain text only." >> /tmp/final_prompt.txt
+          echo "- For Hacker News: use WebFetch on https://news.ycombinator.com/best, extract individual story links (https://news.ycombinator.com/item?id=XXXXXXX), and link directly to them." >> /tmp/final_prompt.txt
+          echo "- When finished, write your COMPLETE output to /tmp/news_output.md using Bash. This file is emailed directly." >> /tmp/final_prompt.txt
 
       # ── 3. Run Claude with the augmented prompt ──────────────────────────────
       - name: Run Claude Code
@@ -136,13 +141,13 @@ jobs:
           # ── Convert markdown to clean minimal HTML ────────────────────────────
           def md_inline(text):
               """Convert inline markdown: bold, italic, bare URLs, and [text](url) links."""
-              # Named links: [text](url)
+              # Named links [text](url)
               text = re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)',
-                            r'<a href="\2" style="color:#000;text-decoration:underline;">\1</a>', text)
+                            r'<a href="\2" style="color:#111;text-decoration:underline;">\1</a>', text)
               # Bare URLs not already inside an href
               text = re.sub(r'(?<!["\(])(https?://[^\s<>"]+)',
                             r'<a href="\1" style="color:#555;text-decoration:underline;">\1</a>', text)
-              # Bold **text** — must come after URL handling
+              # Bold **text**
               text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
               # Italic *text*
               text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
@@ -154,34 +159,36 @@ jobs:
                       .replace("<", "&lt;")
                       .replace(">", "&gt;"))
 
+          # Detect a story headline: a line that is **[text](url)** or **text**
+          bold_link_re = re.compile(r'^\*\*\[.+\]\(https?://.+\)\*\*$')
+          bold_text_re = re.compile(r'^\*\*[^*]+\*\*$')
+
           html_lines = []
           in_list = False
           for line in output.split("\n"):
               stripped = line.strip()
 
-              if line.startswith("### "):
-                  if in_list: html_lines.append("</ul>"); in_list = False
-                  # Strip ** from section titles before rendering
-                  title = re.sub(r'\*\*(.+?)\*\*', r'\1', line[4:])
-                  html_lines.append(f'<h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#999;margin:28px 0 8px 0;">{esc(title)}</h3>')
-              elif line.startswith("## "):
+              if line.startswith("## "):
                   if in_list: html_lines.append("</ul>"); in_list = False
                   title = re.sub(r'\*\*(.+?)\*\*', r'\1', line[3:])
-                  html_lines.append(f'<h2 style="font-size:15px;font-weight:600;color:#111;margin:28px 0 8px 0;padding-bottom:6px;border-bottom:1px solid #eee;">{esc(title)}</h2>')
+                  html_lines.append(f'<h2 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#888;margin:36px 0 12px 0;padding-bottom:6px;border-bottom:2px solid #eee;">{esc(title)}</h2>')
               elif line.startswith("# "):
                   if in_list: html_lines.append("</ul>"); in_list = False
                   title = re.sub(r'\*\*(.+?)\*\*', r'\1', line[2:])
-                  html_lines.append(f'<h1 style="font-size:17px;font-weight:700;color:#000;margin:32px 0 10px 0;">{esc(title)}</h1>')
+                  html_lines.append(f'<h1 style="font-size:18px;font-weight:700;color:#000;margin:32px 0 10px 0;">{esc(title)}</h1>')
+              elif bold_link_re.match(stripped) or (bold_text_re.match(stripped) and not line.startswith("-")):
+                  # Story headline — render as a prominent linked title
+                  if in_list: html_lines.append("</ul>"); in_list = False
+                  html_lines.append(f'<p style="margin:16px 0 4px;font-size:16px;font-weight:600;line-height:1.4;">{md_inline(esc(stripped))}</p>')
               elif line.startswith("- ") or line.startswith("* "):
-                  if not in_list: html_lines.append('<ul style="margin:4px 0 10px;padding-left:16px;list-style:none;">'); in_list = True
-                  inner = md_inline(esc(line[2:]))
-                  html_lines.append(f'<li style="margin:3px 0;color:#444;padding-left:0;">{inner}</li>')
+                  if not in_list: html_lines.append('<ul style="margin:2px 0 10px;padding-left:16px;list-style:none;">'); in_list = True
+                  html_lines.append(f'<li style="margin:2px 0;font-size:13px;color:#555;line-height:1.5;">{md_inline(esc(line[2:]))}</li>')
               elif stripped == "" or stripped == "---":
                   if in_list: html_lines.append("</ul>"); in_list = False
-                  if stripped == "": html_lines.append('<div style="height:6px;"></div>')
+                  if stripped == "": html_lines.append('<div style="height:4px;"></div>')
               else:
                   if in_list: html_lines.append("</ul>"); in_list = False
-                  html_lines.append(f'<p style="margin:0 0 8px;color:#333;line-height:1.6;">{md_inline(esc(line))}</p>')
+                  html_lines.append(f'<p style="margin:0 0 8px;font-size:14px;color:#333;line-height:1.6;">{md_inline(esc(line))}</p>')
 
           if in_list:
               html_lines.append("</ul>")
