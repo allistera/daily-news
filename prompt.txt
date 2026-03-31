@@ -13,7 +13,10 @@ Search and Pull the most relevant articles posted within the last 24 hours from 
 - Wired
 - TechCrunch
 - Ars Technica
-- The Verge
+
+### **The Verge**
+
+I subscribe to the verge so list out their top queries.
 
 ### **Hacker News**
 
