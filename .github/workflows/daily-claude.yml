@@ -20,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Run Claude with prompt.txt, output saved to file ──────────────────
+      # ── 2. Run Claude with prompt.txt ────────────────────────────────────────
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-base-action@beta
@@ -30,106 +30,108 @@ jobs:
           allowed_tools: "web_search,View,GlobTool,GrepTool"
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           max_turns: "15"
-          claude_env: |
-            OUTPUT_FILE: /tmp/claude_output.txt
 
-      # ── 3. Save Claude output to file (response output can be unreliable) ────
-      - name: Save Claude output to file
-        if: always()
-        env:
-          CLAUDE_OUTPUT: ${{ steps.claude.outputs.response }}
-        run: |
-          if [ -n "$CLAUDE_OUTPUT" ]; then
-            echo "$CLAUDE_OUTPUT" > /tmp/claude_output.txt
-            echo "Output captured from action output ($(wc -c < /tmp/claude_output.txt) bytes)"
-          elif [ -f /tmp/claude_output.txt ]; then
-            echo "Output already written to file by Claude"
-          else
-            echo "(Claude returned no output)" > /tmp/claude_output.txt
-            echo "Warning: no output received from Claude"
-          fi
-
-      # ── 4. Send output via Resend ─────────────────────────────────────────────
+      # ── 3. Extract Claude output from execution_file and send via Resend ─────
       - name: Send output via Resend
         if: always()
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
           RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         run: |
           python3 << 'EOF'
           import os, json, subprocess, datetime
 
-          # Read output from file — more reliable than the env var for large outputs
-          try:
-              with open("/tmp/claude_output.txt", "r") as f:
-                  output = f.read().strip()
-          except FileNotFoundError:
-              output = "(no output file found)"
+          run_url   = os.environ.get("RUN_URL", "")
+          api_key   = os.environ.get("RESEND_API_KEY", "")
+          exec_file = os.environ.get("EXECUTION_FILE", "")
+          run_date  = datetime.datetime.now(datetime.timezone.utc).strftime("%A, %d %B %Y")
 
-          if not output:
-              output = "(Claude returned an empty response)"
-
-          run_url  = os.environ.get("RUN_URL", "")
-          api_key  = os.environ.get("RESEND_API_KEY", "")
-          run_date = datetime.datetime.now(datetime.timezone.utc).strftime("%A, %d %B %Y")
+          # ── Extract the last assistant message from the execution log ─────────
+          output = "(no output received)"
+          if exec_file and os.path.exists(exec_file):
+              try:
+                  with open(exec_file, "r") as f:
+                      execution_log = json.load(f)
+                  # Walk backwards to find the last assistant text message
+                  for entry in reversed(execution_log):
+                      role = entry.get("role", "")
+                      content = entry.get("content", "")
+                      if role == "assistant":
+                          if isinstance(content, str) and content.strip():
+                              output = content.strip()
+                              break
+                          elif isinstance(content, list):
+                              # content blocks — find the last text block
+                              for block in reversed(content):
+                                  if isinstance(block, dict) and block.get("type") == "text":
+                                      text = block.get("text", "").strip()
+                                      if text:
+                                          output = text
+                                          break
+                              if output != "(no output received)":
+                                  break
+              except Exception as e:
+                  output = f"(error reading execution file: {e})"
+          else:
+              output = f"(execution file not found: {exec_file!r})"
 
           print(f"Output length: {len(output)} characters")
+          print(f"Output preview: {output[:200]}")
 
-          # ── Convert markdown-style output to readable HTML ───────────────────
-          # Basic conversion: preserve structure without escaping markdown chars
+          # ── Convert markdown to simple HTML ───────────────────────────────────
           html_lines = []
           for line in output.split("\n"):
-              escaped = (
+              esc = (
                   line
                   .replace("&", "&amp;")
                   .replace("<", "&lt;")
                   .replace(">", "&gt;")
               )
-              # Convert ### headings
-              if escaped.startswith("### "):
-                  html_lines.append(f'<h3 style="margin: 20px 0 6px; color: #333;">{escaped[4:]}</h3>')
-              elif escaped.startswith("## "):
-                  html_lines.append(f'<h2 style="margin: 24px 0 8px; color: #111;">{escaped[3:]}</h2>')
-              elif escaped.startswith("# "):
-                  html_lines.append(f'<h1 style="margin: 28px 0 10px; color: #000;">{escaped[2:]}</h1>')
-              # Convert bullet points
-              elif escaped.startswith("- ") or escaped.startswith("* "):
-                  html_lines.append(f'<li style="margin: 4px 0;">{escaped[2:]}</li>')
-              elif escaped.startswith("**") and escaped.endswith("**"):
-                  html_lines.append(f'<strong>{escaped[2:-2]}</strong><br>')
-              elif escaped == "":
+              if esc.startswith("### "):
+                  html_lines.append(f'<h3 style="margin:20px 0 6px;color:#333;">{esc[4:]}</h3>')
+              elif esc.startswith("## "):
+                  html_lines.append(f'<h2 style="margin:24px 0 8px;color:#111;">{esc[3:]}</h2>')
+              elif esc.startswith("# "):
+                  html_lines.append(f'<h1 style="margin:28px 0 10px;color:#000;">{esc[2:]}</h1>')
+              elif esc.startswith("- ") or esc.startswith("* "):
+                  html_lines.append(f'<li style="margin:4px 0;">{esc[2:]}</li>')
+              elif esc == "":
                   html_lines.append("<br>")
               else:
-                  html_lines.append(f'{escaped}<br>')
+                  # Bold **text**
+                  import re
+                  esc = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', esc)
+                  html_lines.append(f'{esc}<br>')
 
           html_body = "\n".join(html_lines)
 
           html = f"""<html>
-            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                         max-width: 760px; margin: auto; padding: 32px; color: #1a1a1a;">
-              <h2 style="margin-bottom: 4px;">&#x1F4F0; Daily News Briefing</h2>
-              <p style="color: #888; font-size: 13px; margin-top: 0;">{run_date}</p>
-              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 20px 0;">
-              <div style="font-size: 14px; line-height: 1.7;">
+            <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+                         max-width:760px;margin:auto;padding:32px;color:#1a1a1a;">
+              <h2 style="margin-bottom:4px;">&#x1F4F0; Daily News Briefing</h2>
+              <p style="color:#888;font-size:13px;margin-top:0;">{run_date}</p>
+              <hr style="border:none;border-top:1px solid #e5e5e5;margin:20px 0;">
+              <div style="font-size:14px;line-height:1.7;">
                 {html_body}
               </div>
-              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 20px 0;">
-              <p style="font-size: 12px; color: #bbb;">
-                <a href="{run_url}" style="color: #6c63ff; text-decoration: none;">View workflow run &rarr;</a>
+              <hr style="border:none;border-top:1px solid #e5e5e5;margin:20px 0;">
+              <p style="font-size:12px;color:#bbb;">
+                <a href="{run_url}" style="color:#6c63ff;text-decoration:none;">View workflow run &rarr;</a>
               </p>
             </body>
           </html>"""
 
-          # ── Resend payload ───────────────────────────────────────────────────
+          # ── Resend payload ────────────────────────────────────────────────────
           payload = {
-              "from":    "Daily News <news@infinitywave.design>",  # ← your verified Resend sender
+              "from":    "Daily News <reports@infinitywave.design>",
               "to":      ["me@allisterantosik.com"],
               "subject": f"Daily News Briefing \u2014 {run_date}",
               "html":    html,
-              "text":    output,  # plain-text fallback
+              "text":    output,
           }
 
-          # ── Send ─────────────────────────────────────────────────────────────
+          # ── Send ──────────────────────────────────────────────────────────────
           result = subprocess.run(
               [
                   "curl", "-s", "-X", "POST",
