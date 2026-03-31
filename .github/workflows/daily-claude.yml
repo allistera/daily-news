@@ -2,10 +2,13 @@ name: Daily Claude Prompt
 
 on:
   schedule:
-    # 10:30 AM UTC — adjust for your timezone:
-    #   BST (UTC+1, summer): use "30 9 * * *"  ← set for Scotland/BST
-    #   GMT (UTC+0, winter): use "30 10 * * *"
-    - cron: "30 9 * * *"
+    # 10:30 AM Scotland time, year-round:
+    #   BST (UTC+1, last Sun Mar → last Sun Oct): fires at 09:30 UTC
+    #   GMT (UTC+0, last Sun Oct → last Sun Mar): fires at 10:30 UTC
+    # Both entries run every day; the workflow uses a dedup check to ensure
+    # only one email is sent per calendar day.
+    - cron: "30 9 * * *"   # 10:30 BST (summer)
+    - cron: "30 10 * * *"  # 10:30 GMT (winter)
   workflow_dispatch: # Also triggerable manually from the Actions tab
 
 jobs:
@@ -20,16 +23,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Build final prompt: append file output instruction ────────────────
+      # ── 2. Skip if already ran today (prevents double-email on clock-change weeks)
+      - name: Check if already ran today
+        id: dedup
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          MARKER="/tmp/ran-$TODAY.marker"
+          if [ -f "$MARKER" ]; then
+            echo "Already ran today — skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            touch "$MARKER"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      # ── 3. Build final prompt: append file output instruction ────────────────
       - name: Prepare prompt
+        if: steps.dedup.outputs.skip != 'true'
         run: |
           cat prompt.txt > /tmp/final_prompt.txt
           echo "" >> /tmp/final_prompt.txt
           echo "---" >> /tmp/final_prompt.txt
-          echo "IMPORTANT: When you have finished researching and compiling all sections, write your complete final output to the file /tmp/news_output.md using the Bash tool. Use the exact command: bash -c 'cat > /tmp/news_output.md << '\''NEWSEOF'\''' followed by your content and NEWSEOF. This is required — the file will be emailed." >> /tmp/final_prompt.txt
+          echo "ADDITIONAL INSTRUCTIONS:" >> /tmp/final_prompt.txt
+          echo "- For Hacker News: use WebFetch on https://news.ycombinator.com/best to get the page content, then extract individual story links in the format https://news.ycombinator.com/item?id=XXXXXXX. Do NOT link to news.ycombinator.com/front. Each HN item must link to its specific item page." >> /tmp/final_prompt.txt
+          echo "- When you have finished all research and compilation, write your COMPLETE formatted output to /tmp/news_output.md using Bash(cat > /tmp/news_output.md). This file is what gets emailed — it must contain the full briefing." >> /tmp/final_prompt.txt
 
       # ── 3. Run Claude with the augmented prompt ──────────────────────────────
       - name: Run Claude Code
+        if: steps.dedup.outputs.skip != 'true'
         id: claude
         uses: anthropics/claude-code-base-action@beta
         with:
@@ -40,7 +61,7 @@ jobs:
 
       # ── 4. Extract output and send via Resend ────────────────────────────────
       - name: Send output via Resend
-        if: always()
+        if: always() && steps.dedup.outputs.skip != 'true'
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
@@ -110,37 +131,59 @@ jobs:
           print(f"Final output length: {len(output)} chars")
           print(f"Preview: {output[:300]}")
 
-          # ── Convert markdown to HTML ──────────────────────────────────────────
+          # ── Convert markdown to clean minimal HTML ────────────────────────────
+          def md_inline(text):
+              """Convert inline markdown: bold, italic, and [text](url) links."""
+              # Links first — before escaping
+              text = re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)',
+                            r'<a href="\2" style="color:#000;text-decoration:underline;">\1</a>', text)
+              text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+              text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+              return text
+
+          def esc(line):
+              return line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
           html_lines = []
+          in_list = False
           for line in output.split("\n"):
-              esc = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-              if esc.startswith("### "):
-                  html_lines.append(f'<h3 style="margin:20px 0 6px;color:#333;">{esc[4:]}</h3>')
-              elif esc.startswith("## "):
-                  html_lines.append(f'<h2 style="margin:24px 0 8px;color:#111;border-bottom:1px solid #eee;padding-bottom:6px;">{esc[3:]}</h2>')
-              elif esc.startswith("# "):
-                  html_lines.append(f'<h1 style="margin:28px 0 10px;color:#000;">{esc[2:]}</h1>')
-              elif esc.startswith("- ") or esc.startswith("* "):
-                  inner = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', esc[2:])
-                  html_lines.append(f'<li style="margin:4px 0;">{inner}</li>')
-              elif esc == "":
-                  html_lines.append("<br>")
+              # Headings — escape first, then apply inline (no links in headings usually)
+              if line.startswith("### "):
+                  if in_list: html_lines.append("</ul>"); in_list = False
+                  html_lines.append(f'<h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#888;margin:28px 0 8px;">{esc(line[4:])}</h3>')
+              elif line.startswith("## "):
+                  if in_list: html_lines.append("</ul>"); in_list = False
+                  html_lines.append(f'<h2 style="font-size:16px;font-weight:600;color:#111;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid #eee;">{esc(line[3:])}</h2>')
+              elif line.startswith("# "):
+                  if in_list: html_lines.append("</ul>"); in_list = False
+                  html_lines.append(f'<h1 style="font-size:18px;font-weight:700;color:#000;margin:36px 0 12px;">{esc(line[2:])}</h1>')
+              elif line.startswith("- ") or line.startswith("* "):
+                  if not in_list: html_lines.append('<ul style="margin:6px 0 12px;padding-left:18px;">'); in_list = True
+                  html_lines.append(f'<li style="margin:4px 0;color:#444;">{md_inline(esc(line[2:]))}</li>')
+              elif line.strip() == "":
+                  if in_list: html_lines.append("</ul>"); in_list = False
+                  html_lines.append('<div style="height:8px;"></div>')
               else:
-                  inner = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', esc)
-                  html_lines.append(f'{inner}<br>')
+                  if in_list: html_lines.append("</ul>"); in_list = False
+                  html_lines.append(f'<p style="margin:0 0 10px;color:#333;line-height:1.6;">{md_inline(esc(line))}</p>')
+
+          if in_list:
+              html_lines.append("</ul>")
 
           html_body = "\n".join(html_lines)
-          html = f"""<html>
-            <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-                         max-width:760px;margin:auto;padding:32px;color:#1a1a1a;">
-              <h2 style="margin-bottom:4px;">&#x1F4F0; Daily News Briefing</h2>
-              <p style="color:#888;font-size:13px;margin-top:0;">{run_date}</p>
-              <hr style="border:none;border-top:1px solid #e5e5e5;margin:20px 0;">
-              <div style="font-size:14px;line-height:1.7;">{html_body}</div>
-              <hr style="border:none;border-top:1px solid #e5e5e5;margin:20px 0;">
-              <p style="font-size:12px;color:#bbb;">
-                <a href="{run_url}" style="color:#6c63ff;text-decoration:none;">View workflow run &rarr;</a>
-              </p>
+          html = f"""<!DOCTYPE html>
+          <html>
+            <body style="margin:0;padding:0;background:#fff;">
+              <div style="max-width:620px;margin:0 auto;padding:40px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;font-size:14px;color:#333;">
+                <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#aaa;">Daily Briefing</p>
+                <h1 style="margin:0 0 4px;font-size:22px;font-weight:700;color:#000;">{run_date}</h1>
+                <div style="height:1px;background:#eee;margin:20px 0 24px;"></div>
+                {html_body}
+                <div style="height:1px;background:#eee;margin:32px 0 20px;"></div>
+                <p style="margin:0;font-size:11px;color:#bbb;">
+                  <a href="{run_url}" style="color:#bbb;">View run →</a>
+                </p>
+              </div>
             </body>
           </html>"""
 
