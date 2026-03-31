@@ -26,12 +26,12 @@ jobs:
         uses: anthropics/claude-code-base-action@beta
         with:
           prompt_file: "prompt.txt"
-          # web_search is required — the prompt fetches live news articles
-          allowed_tools: "web_search,View,GlobTool,GrepTool"
+          # WebSearch and WebFetch are the correct tool names for this action
+          allowed_tools: "WebSearch,WebFetch,View,GlobTool,GrepTool"
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           max_turns: "15"
 
-      # ── 3. Extract Claude output from execution_file and send via Resend ─────
+      # ── 3. Extract Claude output and send via Resend ──────────────────────────
       - name: Send output via Resend
         if: always()
         env:
@@ -47,39 +47,54 @@ jobs:
           exec_file = os.environ.get("EXECUTION_FILE", "")
           run_date  = datetime.datetime.now(datetime.timezone.utc).strftime("%A, %d %B %Y")
 
-          # ── Extract the last assistant message from the execution log ─────────
+          # ── Parse the execution file (newline-delimited JSON, one object per line)
           output = "(no output received)"
           if exec_file and os.path.exists(exec_file):
               try:
                   with open(exec_file, "r") as f:
-                      execution_log = json.load(f)
-                  # Walk backwards to find the last assistant text message
-                  for entry in reversed(execution_log):
-                      role = entry.get("role", "")
-                      content = entry.get("content", "")
-                      if role == "assistant":
-                          if isinstance(content, str) and content.strip():
-                              output = content.strip()
-                              break
-                          elif isinstance(content, list):
-                              # content blocks — find the last text block
-                              for block in reversed(content):
-                                  if isinstance(block, dict) and block.get("type") == "text":
-                                      text = block.get("text", "").strip()
-                                      if text:
-                                          output = text
-                                          break
+                      lines = f.read().strip().splitlines()
+
+                  # Parse each line as a separate JSON object
+                  entries = []
+                  for line in lines:
+                      line = line.strip()
+                      if line:
+                          try:
+                              entries.append(json.loads(line))
+                          except json.JSONDecodeError:
+                              pass
+
+                  # First try: find the "result" entry which has the final answer
+                  for entry in reversed(entries):
+                      if entry.get("type") == "result" and entry.get("result"):
+                          output = entry["result"].strip()
+                          break
+
+                  # Fallback: find the last assistant message with text content
+                  if output == "(no output received)":
+                      for entry in reversed(entries):
+                          if entry.get("type") == "assistant":
+                              content = entry.get("message", {}).get("content", [])
+                              if isinstance(content, list):
+                                  for block in reversed(content):
+                                      if isinstance(block, dict) and block.get("type") == "text":
+                                          text = block.get("text", "").strip()
+                                          if text:
+                                              output = text
+                                              break
                               if output != "(no output received)":
                                   break
+
               except Exception as e:
                   output = f"(error reading execution file: {e})"
           else:
               output = f"(execution file not found: {exec_file!r})"
 
           print(f"Output length: {len(output)} characters")
-          print(f"Output preview: {output[:200]}")
+          print(f"Output preview: {output[:300]}")
 
           # ── Convert markdown to simple HTML ───────────────────────────────────
+          import re
           html_lines = []
           for line in output.split("\n"):
               esc = (
@@ -91,18 +106,17 @@ jobs:
               if esc.startswith("### "):
                   html_lines.append(f'<h3 style="margin:20px 0 6px;color:#333;">{esc[4:]}</h3>')
               elif esc.startswith("## "):
-                  html_lines.append(f'<h2 style="margin:24px 0 8px;color:#111;">{esc[3:]}</h2>')
+                  html_lines.append(f'<h2 style="margin:24px 0 8px;color:#111;border-bottom:1px solid #eee;padding-bottom:6px;">{esc[3:]}</h2>')
               elif esc.startswith("# "):
                   html_lines.append(f'<h1 style="margin:28px 0 10px;color:#000;">{esc[2:]}</h1>')
               elif esc.startswith("- ") or esc.startswith("* "):
-                  html_lines.append(f'<li style="margin:4px 0;">{esc[2:]}</li>')
+                  inner = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', esc[2:])
+                  html_lines.append(f'<li style="margin:4px 0;">{inner}</li>')
               elif esc == "":
                   html_lines.append("<br>")
               else:
-                  # Bold **text**
-                  import re
-                  esc = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', esc)
-                  html_lines.append(f'{esc}<br>')
+                  inner = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', esc)
+                  html_lines.append(f'{inner}<br>')
 
           html_body = "\n".join(html_lines)
 
