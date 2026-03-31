@@ -26,10 +26,10 @@ jobs:
         uses: anthropics/claude-code-base-action@beta
         with:
           prompt_file: "prompt.txt"
-          # WebSearch and WebFetch are the correct tool names for this action
           allowed_tools: "WebSearch,WebFetch,View,GlobTool,GrepTool"
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          max_turns: "15"
+          # 30 turns gives Claude room to search all sources AND write the summary
+          max_turns: "30"
 
       # ── 3. Extract Claude output and send via Resend ──────────────────────────
       - name: Send output via Resend
@@ -40,69 +40,95 @@ jobs:
           RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         run: |
           python3 << 'EOF'
-          import os, json, subprocess, datetime
+          import os, json, subprocess, datetime, re
 
           run_url   = os.environ.get("RUN_URL", "")
           api_key   = os.environ.get("RESEND_API_KEY", "")
           exec_file = os.environ.get("EXECUTION_FILE", "")
           run_date  = datetime.datetime.now(datetime.timezone.utc).strftime("%A, %d %B %Y")
 
-          # ── Parse the execution file (newline-delimited JSON, one object per line)
+          # ── Parse execution file (mixed pretty-printed and compact NDJSON) ────
           output = "(no output received)"
-          if exec_file and os.path.exists(exec_file):
+
+          if not exec_file or not os.path.exists(exec_file):
+              output = f"(execution file not found: {exec_file!r})"
+          else:
               try:
-                  with open(exec_file, "r") as f:
-                      lines = f.read().strip().splitlines()
+                  raw = open(exec_file).read()
 
-                  # Parse each line as a separate JSON object
+                  # Split into individual JSON objects by finding top-level braces.
+                  # The file mixes pretty-printed and single-line objects so we
+                  # can't simply splitlines — instead re-parse the whole blob.
                   entries = []
-                  for line in lines:
-                      line = line.strip()
-                      if line:
-                          try:
-                              entries.append(json.loads(line))
-                          except json.JSONDecodeError:
-                              pass
+                  depth = 0
+                  start = None
+                  for i, ch in enumerate(raw):
+                      if ch == '{':
+                          if depth == 0:
+                              start = i
+                          depth += 1
+                      elif ch == '}':
+                          depth -= 1
+                          if depth == 0 and start is not None:
+                              chunk = raw[start:i+1].strip()
+                              try:
+                                  entries.append(json.loads(chunk))
+                              except json.JSONDecodeError:
+                                  pass
+                              start = None
 
-                  # First try: find the "result" entry which has the final answer
+                  print(f"Parsed {len(entries)} entries from execution file")
+
+                  # Priority 1: last assistant message with actual text content
                   for entry in reversed(entries):
-                      if entry.get("type") == "result" and entry.get("result"):
-                          output = entry["result"].strip()
+                      if entry.get("type") != "assistant":
+                          continue
+                      content = entry.get("message", {}).get("content", [])
+                      if isinstance(content, list):
+                          for block in reversed(content):
+                              if isinstance(block, dict) and block.get("type") == "text":
+                                  text = block.get("text", "").strip()
+                                  if text and len(text) > 50:
+                                      output = text
+                                      break
+                      if output != "(no output received)":
                           break
 
-                  # Fallback: find the last assistant message with text content
+                  # Priority 2: result entry with a non-empty result field
                   if output == "(no output received)":
                       for entry in reversed(entries):
-                          if entry.get("type") == "assistant":
-                              content = entry.get("message", {}).get("content", [])
-                              if isinstance(content, list):
-                                  for block in reversed(content):
-                                      if isinstance(block, dict) and block.get("type") == "text":
-                                          text = block.get("text", "").strip()
-                                          if text:
-                                              output = text
-                                              break
-                              if output != "(no output received)":
-                                  break
+                          if entry.get("type") == "result" and entry.get("result", "").strip():
+                              output = entry["result"].strip()
+                              break
+
+                  # Priority 3: last user tool_result with substantial text content
+                  # (catches cases where Claude ran out of turns mid-search)
+                  if output == "(no output received)":
+                      for entry in reversed(entries):
+                          if entry.get("type") != "user":
+                              continue
+                          content = entry.get("message", {}).get("content", [])
+                          if isinstance(content, list):
+                              for block in reversed(content):
+                                  if isinstance(block, dict) and block.get("type") == "tool_result":
+                                      text = block.get("content", "")
+                                      if isinstance(text, str) and len(text) > 200:
+                                          output = f"[Note: Claude ran out of turns. Last search result below]\n\n{text}"
+                                          break
+                          if output != "(no output received)":
+                              break
 
               except Exception as e:
-                  output = f"(error reading execution file: {e})"
-          else:
-              output = f"(execution file not found: {exec_file!r})"
+                  import traceback
+                  output = f"(error reading execution file: {e}\n{traceback.format_exc()})"
 
           print(f"Output length: {len(output)} characters")
           print(f"Output preview: {output[:300]}")
 
-          # ── Convert markdown to simple HTML ───────────────────────────────────
-          import re
+          # ── Convert markdown to HTML ──────────────────────────────────────────
           html_lines = []
           for line in output.split("\n"):
-              esc = (
-                  line
-                  .replace("&", "&amp;")
-                  .replace("<", "&lt;")
-                  .replace(">", "&gt;")
-              )
+              esc = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
               if esc.startswith("### "):
                   html_lines.append(f'<h3 style="margin:20px 0 6px;color:#333;">{esc[4:]}</h3>')
               elif esc.startswith("## "):
@@ -136,7 +162,6 @@ jobs:
             </body>
           </html>"""
 
-          # ── Resend payload ────────────────────────────────────────────────────
           payload = {
               "from":    "Daily News <reports@infinitywave.design>",
               "to":      ["me@allisterantosik.com"],
@@ -145,31 +170,24 @@ jobs:
               "text":    output,
           }
 
-          # ── Send ──────────────────────────────────────────────────────────────
           result = subprocess.run(
-              [
-                  "curl", "-s", "-X", "POST",
-                  "https://api.resend.com/emails",
-                  "-H", f"Authorization: Bearer {api_key}",
-                  "-H", "Content-Type: application/json",
-                  "-d", json.dumps(payload),
-                  "--fail-with-body",
-              ],
-              capture_output=True,
-              text=True,
+              ["curl", "-s", "-X", "POST", "https://api.resend.com/emails",
+               "-H", f"Authorization: Bearer {api_key}",
+               "-H", "Content-Type: application/json",
+               "-d", json.dumps(payload),
+               "--fail-with-body"],
+              capture_output=True, text=True,
           )
 
           print("=== Resend response ===")
           print(result.stdout)
 
           if result.returncode != 0:
-              print("=== stderr ===")
-              print(result.stderr)
-              raise SystemExit(f"curl exited with code {result.returncode}")
+              raise SystemExit(f"curl failed: {result.stderr}")
 
           response = json.loads(result.stdout)
           if "id" in response:
-              print(f"Email sent successfully. Resend ID: {response['id']}")
+              print(f"Email sent. Resend ID: {response['id']}")
           else:
               raise SystemExit(f"Unexpected Resend response: {result.stdout}")
           EOF
