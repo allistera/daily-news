@@ -50,6 +50,7 @@ jobs:
           echo "  - **Source**: Publication name" >> /tmp/final_prompt.txt
           echo "  - **Context**: One sentence explanation." >> /tmp/final_prompt.txt
           echo "- The headline MUST always be a clickable markdown link [text](url). A story with no URL must be omitted entirely." >> /tmp/final_prompt.txt
+          echo "- URLs must be real article permalinks. Never use search-result URLs (e.g. https://search-result/...). To get the real URL: use WebFetch on the publication's homepage or search page, extract article links from the page HTML, then use those direct URLs. If you cannot find a real permalink, omit the story." >> /tmp/final_prompt.txt
           echo "- Use ## for section headings (World News, Technology, Hacker News). Never use ### for story titles." >> /tmp/final_prompt.txt
           echo "- Never use **bold** markers inside ## section headings. Plain text only." >> /tmp/final_prompt.txt
           echo "- For Hacker News: use WebFetch on https://news.ycombinator.com/best, extract individual story links (https://news.ycombinator.com/item?id=XXXXXXX), and link directly to them." >> /tmp/final_prompt.txt
