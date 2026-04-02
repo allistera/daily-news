@@ -1,0 +1,311 @@
+"""Daily news briefing: fetch RSS + HN → Claude → Resend."""
+
+import json
+import os
+import re
+import time
+import urllib.request
+from datetime import datetime, timezone, timedelta
+from xml.etree import ElementTree as ET
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
+FEEDS = {
+    "World News": [
+        "https://feeds.bbci.co.uk/news/rss.xml",
+        "https://www.theguardian.com/world/rss",
+        "https://www.dailymail.co.uk/news/index.rss",
+    ],
+    "Technology": [
+        "https://www.wired.com/feed/rss",
+        "https://techcrunch.com/feed/",
+        "https://feeds.arstechnica.com/arstechnica/index",
+        "https://www.theverge.com/rss/index.xml",
+    ],
+}
+
+CLAUDE_MODEL = "claude-opus-4-6"
+MAX_TOKENS   = 4096
+CUTOFF_HOURS = 24
+MAX_PER_FEED = 10   # articles per feed passed to Claude
+HN_COUNT     = 5
+
+# ---------------------------------------------------------------------------
+# RSS helpers
+# ---------------------------------------------------------------------------
+
+NS = {"dc": "http://purl.org/dc/elements/1.1/", "atom": "http://www.w3.org/2005/Atom"}
+
+def _parse_date(text):
+    """Parse RFC 2822 or ISO 8601 date strings; return UTC-aware datetime or None."""
+    if not text:
+        return None
+    text = text.strip()
+    # RFC 2822 (most RSS feeds)
+    try:
+        from email.utils import parsedate_to_datetime
+        return parsedate_to_datetime(text).astimezone(timezone.utc)
+    except Exception:
+        pass
+    # ISO 8601
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(text[:len(fmt)], fmt)
+            return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def fetch_feed(url, cutoff):
+    """Return list of {title, url} dicts published after cutoff."""
+    try:
+        with urllib.request.urlopen(url, timeout=15) as r:
+            root = ET.fromstring(r.read())
+    except Exception as e:
+        print(f"  WARN: could not fetch {url}: {e}")
+        return []
+
+    # Support both RSS <item> and Atom <entry>
+    items = root.findall(".//item") or root.findall(".//{http://www.w3.org/2005/Atom}entry")
+    results = []
+    for item in items:
+        # Date
+        raw_date = (
+            item.findtext("pubDate")
+            or item.findtext("dc:date", namespaces=NS)
+            or item.findtext("{http://www.w3.org/2005/Atom}updated")
+            or item.findtext("{http://www.w3.org/2005/Atom}published")
+        )
+        dt = _parse_date(raw_date)
+        if dt and dt < cutoff:
+            continue
+
+        # Title
+        title = (
+            item.findtext("title")
+            or item.findtext("{http://www.w3.org/2005/Atom}title")
+            or ""
+        ).strip()
+
+        # Link
+        link = item.findtext("link") or ""
+        if not link:
+            link_el = item.find("{http://www.w3.org/2005/Atom}link")
+            if link_el is not None:
+                link = link_el.get("href", "")
+        link = link.strip()
+
+        if title and link:
+            results.append({"title": title, "url": link})
+
+    return results[:MAX_PER_FEED]
+
+
+# ---------------------------------------------------------------------------
+# Hacker News (Algolia)
+# ---------------------------------------------------------------------------
+
+def fetch_hn(cutoff):
+    since = int(cutoff.timestamp())
+    url = (
+        f"https://hn.algolia.com/api/v1/search_by_date"
+        f"?tags=story&numericFilters=created_at_i>{since}&hitsPerPage=200"
+    )
+    with urllib.request.urlopen(url, timeout=15) as r:
+        data = json.loads(r.read())
+
+    hits = sorted(data["hits"], key=lambda h: h.get("points", 0), reverse=True)[:HN_COUNT]
+    return [
+        {
+            "title":    h.get("title", "Untitled"),
+            "url":      f"https://news.ycombinator.com/item?id={h['objectID']}",
+            "points":   h.get("points", 0),
+            "comments": h.get("num_comments", 0),
+        }
+        for h in hits
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Claude
+# ---------------------------------------------------------------------------
+
+def call_claude(system, user):
+    payload = json.dumps({
+        "model":      CLAUDE_MODEL,
+        "max_tokens": MAX_TOKENS,
+        "system":     system,
+        "messages":   [{"role": "user", "content": user}],
+    }).encode()
+
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "x-api-key":         os.environ["ANTHROPIC_API_KEY"],
+            "anthropic-version": "2023-06-01",
+            "content-type":      "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.loads(r.read())["content"][0]["text"]
+
+
+# ---------------------------------------------------------------------------
+# Markdown → HTML
+# ---------------------------------------------------------------------------
+
+def md_to_html(md):
+    def inline(text):
+        text = re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)',
+                      r'<a href="\2" style="color:#111;text-decoration:underline;">\1</a>', text)
+        text = re.sub(r'(?<!["\(])(https?://\S+)',
+                      r'<a href="\1" style="color:#555;text-decoration:underline;">\1</a>', text)
+        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+        text = re.sub(r'\*(.+?)\*',     r'<em>\1</em>',         text)
+        return text
+
+    def esc(s):
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    bold_link = re.compile(r'^\*\*\[.+\]\(https?://.+\)\*\*$')
+    bold_text = re.compile(r'^\*\*[^*]+\*\*$')
+
+    html, in_list = [], False
+    for line in md.split("\n"):
+        s = line.strip()
+        if line.startswith("## "):
+            if in_list: html.append("</ul>"); in_list = False
+            html.append(f'<h2 style="font-size:13px;font-weight:700;text-transform:uppercase;'
+                        f'letter-spacing:.07em;color:#888;margin:36px 0 12px;'
+                        f'padding-bottom:6px;border-bottom:2px solid #eee;">{esc(line[3:])}</h2>')
+        elif line.startswith("# "):
+            if in_list: html.append("</ul>"); in_list = False
+            html.append(f'<h1 style="font-size:18px;font-weight:700;color:#000;margin:32px 0 10px;">'
+                        f'{esc(line[2:])}</h1>')
+        elif bold_link.match(s) or (bold_text.match(s) and not line.startswith("-")):
+            if in_list: html.append("</ul>"); in_list = False
+            html.append(f'<p style="margin:16px 0 4px;font-size:16px;font-weight:600;line-height:1.4;">'
+                        f'{inline(esc(s))}</p>')
+        elif line.startswith("- ") or line.startswith("* "):
+            if not in_list:
+                html.append('<ul style="margin:2px 0 10px;padding-left:16px;list-style:none;">')
+                in_list = True
+            html.append(f'<li style="margin:2px 0;font-size:13px;color:#555;line-height:1.5;">'
+                        f'{inline(esc(line[2:]))}</li>')
+        elif not s or s == "---":
+            if in_list: html.append("</ul>"); in_list = False
+            if not s: html.append('<div style="height:4px;"></div>')
+        else:
+            if in_list: html.append("</ul>"); in_list = False
+            html.append(f'<p style="margin:0 0 8px;font-size:14px;color:#333;line-height:1.6;">'
+                        f'{inline(esc(line))}</p>')
+
+    if in_list:
+        html.append("</ul>")
+    return "\n".join(html)
+
+
+def wrap_email(body_html, date_str, run_url):
+    return f"""<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#fff;">
+  <div style="max-width:620px;margin:0 auto;padding:40px 32px;
+              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+              font-size:14px;color:#333;">
+    <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#aaa;">Daily Briefing</p>
+    <h1 style="margin:0 0 4px;font-size:22px;font-weight:700;color:#000;">{date_str}</h1>
+    <div style="height:1px;background:#eee;margin:20px 0 24px;"></div>
+    {body_html}
+    <div style="height:1px;background:#eee;margin:32px 0 20px;"></div>
+    <p style="margin:0;font-size:11px;color:#bbb;">
+      <a href="{run_url}" style="color:#bbb;">View run →</a>
+    </p>
+  </div>
+</body>
+</html>"""
+
+
+# ---------------------------------------------------------------------------
+# Resend
+# ---------------------------------------------------------------------------
+
+def send_email(subject, html, text):
+    payload = json.dumps({
+        "from":    "Daily News <reports@infinitywave.design>",
+        "to":      ["me@allisterantosik.com"],
+        "subject": subject,
+        "html":    html,
+        "text":    text,
+    }).encode()
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization":  f"Bearer {os.environ['RESEND_API_KEY']}",
+            "Content-Type":   "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=30) as r:
+        resp = json.loads(r.read())
+    if "id" not in resp:
+        raise RuntimeError(f"Unexpected Resend response: {resp}")
+    print(f"Email sent. Resend ID: {resp['id']}")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def build_content(cutoff):
+    sections = []
+
+    for section, urls in FEEDS.items():
+        articles = []
+        for url in urls:
+            articles.extend(fetch_feed(url, cutoff))
+        if articles:
+            lines = [f"## {section}"]
+            for a in articles:
+                lines.append(f"- [{a['title']}]({a['url']})")
+            sections.append("\n".join(lines))
+
+    # Hacker News
+    hn = fetch_hn(cutoff)
+    if hn:
+        lines = ["## Hacker News"]
+        for h in hn:
+            lines.append(f"- [{h['title']}]({h['url']}) — {h['points']} points, {h['comments']} comments")
+        sections.append("\n".join(lines))
+
+    return "\n\n".join(sections)
+
+
+def main():
+    cutoff  = datetime.now(timezone.utc) - timedelta(hours=CUTOFF_HOURS)
+    now_str = datetime.now(timezone.utc).strftime("%A, %d %B %Y")
+
+    print("Fetching articles...")
+    content = build_content(cutoff)
+    print(f"Fetched {content.count(chr(10))} lines of content")
+
+    system = open("prompt.txt").read().strip()
+
+    print("Calling Claude...")
+    digest = call_claude(system, content)
+    print(f"Got {len(digest)} chars from Claude")
+
+    run_url = os.environ.get("RUN_URL", "")
+    html    = wrap_email(md_to_html(digest), now_str, run_url)
+    subject = f"Daily News Briefing — {now_str}"
+
+    print("Sending email...")
+    send_email(subject, html, digest)
+
+
+if __name__ == "__main__":
+    main()

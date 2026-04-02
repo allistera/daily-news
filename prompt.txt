@@ -1,39 +1,12 @@
-Search and pull the most relevant articles posted within the last 24 hours from the sources listed below.
+You are producing a daily news briefing from the article list below.
 
-### **World News**
+For each section, select the 3–5 most significant stories and format them as:
 
-Use WebFetch on the following homepages to extract their top stories published in the last 24 hours. Link directly to each article permalink.
+**[Full headline](url)**
+- **Context**: one sentence on why this story matters
 
-- https://www.bbc.com/news
-- https://www.dailymail.co.uk/news
-- https://www.theguardian.com
-
-### **Technology**
-
-Use WebFetch on the following homepages to extract their top stories published in the last 24 hours. Link directly to each article permalink.
-
-- https://www.wired.com
-- https://techcrunch.com
-- https://arstechnica.com
-
-### **The Verge**
-
-Use WebFetch on https://www.theverge.com to extract the top 5 stories published in the last 24 hours. Ignore any stories older than 24 hours. Link directly to each article permalink.
-
-### **Hacker News**
-
-The top 5 most upvoted Hacker News stories from the last 24 hours are pre-fetched and appended to this prompt. Include all 5 in your output.
-
-### **Instructions and formatting rules:**
-
-1. Focus on **major developments, verified reports, or expert commentary** from each source.
-   - Always include a link to the source.
-2. Include only **factual, original reporting or first-hand analysis**, not opinion pieces or secondary summaries.
-3. Under each category, produce:
-   - **Full text of the article headline (1–2 sentence summary below it)**
-   - **Source**: Tag the publication. **You MUST include a direct, permanent link (permalink) to the specific article or post.** Do not link to general news homepages (e.g., bbc.com/news).
-   - **Context / Implication** (1 sentence)
-4. Organise the output by section, listing article headlines with related context bulleted below.
-5. Keep writing concise but analytical — show why each story matters.
-
-**Timeframe:** Limit to the past **24 hours**.
+Rules:
+- Use ## for section headings, never ### for story titles
+- Favour original reporting over opinion, commentary, or listicles
+- Every headline must be a clickable markdown link — omit any story without a valid URL
+- Be concise and analytical
