@@ -53,10 +53,44 @@ jobs:
           echo "- URLs must be real article permalinks. Never use search-result URLs (e.g. https://search-result/...). To get the real URL: use WebFetch on the publication's homepage or search page, extract article links from the page HTML, then use those direct URLs. If you cannot find a real permalink, omit the story." >> /tmp/final_prompt.txt
           echo "- Use ## for section headings (World News, Technology, Hacker News). Never use ### for story titles." >> /tmp/final_prompt.txt
           echo "- Never use **bold** markers inside ## section headings. Plain text only." >> /tmp/final_prompt.txt
-          echo "- For Hacker News: use WebFetch on https://news.ycombinator.com/best, extract individual story links (https://news.ycombinator.com/item?id=XXXXXXX), and link directly to them." >> /tmp/final_prompt.txt
+          echo "- For Hacker News: the top 5 stories are pre-fetched at the end of this prompt. Use those titles and URLs exactly as provided — do not search for additional HN stories." >> /tmp/final_prompt.txt
           echo "- When finished, write your COMPLETE output to /tmp/news_output.md using Bash. This file is emailed directly." >> /tmp/final_prompt.txt
 
-      # ── 3. Run Claude with the augmented prompt ──────────────────────────────
+      # ── 4. Fetch top 5 HN stories and append to prompt ──────────────────────
+      - name: Fetch top Hacker News stories
+        if: steps.dedup.outputs.skip != 'true'
+        run: |
+          python3 << 'EOF'
+          import urllib.request, json, time
+
+          since = int(time.time()) - 86400
+          url = f"https://hn.algolia.com/api/v1/search_by_date?tags=story&numericFilters=created_at_i>{since}&hitsPerPage=200"
+
+          with urllib.request.urlopen(url, timeout=15) as resp:
+              data = json.loads(resp.read())
+
+          hits = sorted(data["hits"], key=lambda h: h.get("points", 0), reverse=True)[:5]
+
+          lines = ["", "---", "## Hacker News (pre-fetched — top 5 from last 24 hours)", ""]
+          for i, h in enumerate(hits, 1):
+              title   = h.get("title", "Untitled")
+              hn_url  = f"https://news.ycombinator.com/item?id={h['objectID']}"
+              article = h.get("url") or hn_url
+              points  = h.get("points", 0)
+              comments = h.get("num_comments", 0)
+              lines.append(f"{i}. Title: {title}")
+              lines.append(f"   HN discussion: {hn_url}")
+              lines.append(f"   Article URL: {article}")
+              lines.append(f"   Points: {points} | Comments: {comments}")
+              lines.append("")
+
+          with open("/tmp/final_prompt.txt", "a") as f:
+              f.write("\n".join(lines))
+
+          print(f"Appended {len(hits)} HN stories to prompt")
+          EOF
+
+      # ── 5. Run Claude with the augmented prompt ──────────────────────────────
       - name: Run Claude Code
         if: steps.dedup.outputs.skip != 'true'
         id: claude
@@ -67,7 +101,7 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           max_turns: "40"
 
-      # ── 4. Extract output and send via Resend ────────────────────────────────
+      # ── 6. Extract output and send via Resend ────────────────────────────────
       - name: Send output via Resend
         if: always() && steps.dedup.outputs.skip != 'true'
         env:

@@ -1,39 +1,39 @@
-Search and Pull the most relevant articles posted within the last 24 hours from the list of trusted journalists and publications below or their contemporaries.
-
-### **Topics/sources to monitor**
+Search and pull the most relevant articles posted within the last 24 hours from the sources listed below.
 
 ### **World News**
 
-- BBC News
-- Daily Mail
-- The Guardian
+Use WebFetch on the following homepages to extract their top stories published in the last 24 hours. Link directly to each article permalink.
+
+- https://www.bbc.com/news
+- https://www.dailymail.co.uk/news
+- https://www.theguardian.com
 
 ### **Technology**
 
-- Wired
-- TechCrunch
-- Ars Technica
+Use WebFetch on the following homepages to extract their top stories published in the last 24 hours. Link directly to each article permalink.
+
+- https://www.wired.com
+- https://techcrunch.com
+- https://arstechnica.com
 
 ### **The Verge**
 
-I subscribe to the verge so list out their top queries.
+Use WebFetch on https://www.theverge.com to extract the top 5 stories published in the last 24 hours. Ignore any stories older than 24 hours. Link directly to each article permalink.
 
 ### **Hacker News**
 
-List any hackernews articles in the last 24 hours with over 1000 upvotes
+The top 5 most upvoted Hacker News stories from the last 24 hours are pre-fetched and appended to this prompt. Include all 5 in your output.
 
 ### **Instructions and formatting rules:**
 
 1. Focus on **major developments, verified reports, or expert commentary** from each source.
-- Always include a link to the source
+   - Always include a link to the source.
 2. Include only **factual, original reporting or first-hand analysis**, not opinion pieces or secondary summaries.
-4. Under each category, produce:
-- **Full Text off Headline of Article (1–2 sentences for articles)**
-- **Source(s)**
-    - Tag the publication.
-    - **You MUST include a direct, permanent link (permalink) to the specific article or post.** Do not link to general news homepages (e.g., bbc.com/news).
-- **Context / Implication for articles only (1 sentence)**
-5. Organize the output by section listing Article Headlines with related context bulleted below.
-6. Keep writing concise but analytical — show why each story matters.
+3. Under each category, produce:
+   - **Full text of the article headline (1–2 sentence summary below it)**
+   - **Source**: Tag the publication. **You MUST include a direct, permanent link (permalink) to the specific article or post.** Do not link to general news homepages (e.g., bbc.com/news).
+   - **Context / Implication** (1 sentence)
+4. Organise the output by section, listing article headlines with related context bulleted below.
+5. Keep writing concise but analytical — show why each story matters.
 
 **Timeframe:** Limit to the past **24 hours**.
