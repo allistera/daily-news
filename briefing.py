@@ -63,10 +63,17 @@ def _parse_date(text):
     return None
 
 
+RSS_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
+
 def fetch_feed(url, cutoff):
     """Return list of {title, url} dicts published after cutoff."""
     try:
-        with urllib.request.urlopen(url, timeout=15) as r:
+        req = urllib.request.Request(url, headers={"User-Agent": RSS_UA})
+        with urllib.request.urlopen(req, timeout=15) as r:
             root = ET.fromstring(r.read())
     except Exception as e:
         print(f"  WARN: could not fetch {url}: {e}")
