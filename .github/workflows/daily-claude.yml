@@ -17,7 +17,7 @@ jobs:
 
       - name: Send daily briefing
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           RESEND_API_KEY:    ${{ secrets.RESEND_API_KEY }}
           RUN_URL:           "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         run: python3 briefing.py

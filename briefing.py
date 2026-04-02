@@ -1,4 +1,4 @@
-"""Daily news briefing: fetch RSS + HN → Claude → Resend."""
+"""Daily news briefing: fetch RSS + HN → OpenRouter → Resend."""
 
 import json
 import os
@@ -26,7 +26,7 @@ FEEDS = {
     ],
 }
 
-CLAUDE_MODEL = "claude-opus-4-6"
+MODEL        = "anthropic/claude-opus-4-5"
 MAX_TOKENS   = 4096
 CUTOFF_HOURS = 24
 MAX_PER_FEED = 10   # articles per feed passed to Claude
@@ -130,28 +130,29 @@ def fetch_hn(cutoff):
 
 
 # ---------------------------------------------------------------------------
-# Claude
+# OpenRouter
 # ---------------------------------------------------------------------------
 
-def call_claude(system, user):
+def call_llm(system, user):
     payload = json.dumps({
-        "model":      CLAUDE_MODEL,
+        "model":      MODEL,
         "max_tokens": MAX_TOKENS,
-        "system":     system,
-        "messages":   [{"role": "user", "content": user}],
+        "messages":   [
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user},
+        ],
     }).encode()
 
     req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
+        "https://openrouter.ai/api/v1/chat/completions",
         data=payload,
         headers={
-            "x-api-key":         os.environ["ANTHROPIC_API_KEY"],
-            "anthropic-version": "2023-06-01",
-            "content-type":      "application/json",
+            "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
+            "Content-Type":  "application/json",
         },
     )
     with urllib.request.urlopen(req, timeout=120) as r:
-        return json.loads(r.read())["content"][0]["text"]
+        return json.loads(r.read())["choices"][0]["message"]["content"]
 
 
 # ---------------------------------------------------------------------------
@@ -295,8 +296,8 @@ def main():
 
     system = open("prompt.txt").read().strip()
 
-    print("Calling Claude...")
-    digest = call_claude(system, content)
+    print("Calling OpenRouter...")
+    digest = call_llm(system, content)
     print(f"Got {len(digest)} chars from Claude")
 
     run_url = os.environ.get("RUN_URL", "")
