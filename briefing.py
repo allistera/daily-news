@@ -261,6 +261,7 @@ def send_email(subject, html, text):
         headers={
             "Authorization":  f"Bearer {os.environ['RESEND_API_KEY']}",
             "Content-Type":   "application/json",
+            "User-Agent":     "curl/8.7.1",
         },
     )
     try:
