@@ -24,12 +24,16 @@ FEEDS = {
         "https://feeds.arstechnica.com/arstechnica/index",
         "https://www.theverge.com/rss/index.xml",
     ],
+    "Product Hunt": [
+        "https://www.producthunt.com/feed",
+    ],
 }
 
 MODEL        = "google/gemini-2.5-flash"
 MAX_TOKENS   = 4096
 CUTOFF_HOURS = 24
-MAX_PER_FEED = 10   # articles per feed passed to Claude
+MAX_PER_FEED  = 10   # articles per feed passed to Claude
+FEED_LIMITS   = {"Product Hunt": 5}
 HN_COUNT     = 5
 
 # ---------------------------------------------------------------------------
@@ -266,9 +270,11 @@ def build_content(cutoff):
     sections = []
 
     for section, urls in FEEDS.items():
+        limit = FEED_LIMITS.get(section, MAX_PER_FEED)
         articles = []
         for url in urls:
             articles.extend(fetch_feed(url, cutoff))
+        articles = articles[:limit]
         if articles:
             lines = [f"## {section}"]
             for a in articles:
