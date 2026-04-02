@@ -28,6 +28,10 @@ FEEDS = {
     "Product Hunt": [
         "https://www.producthunt.com/feed",
     ],
+    "Smart Home": [
+        "https://www.theverge.com/rss/smart-home/index.xml",
+        "https://www.cnet.com/rss/smart-home/",
+    ],
 }
 
 MODEL        = "google/gemini-2.5-flash"
