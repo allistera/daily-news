@@ -26,7 +26,7 @@ FEEDS = {
     ],
 }
 
-MODEL        = "anthropic/claude-opus-4-5"
+MODEL        = "google/gemini-2.5-flash"
 MAX_TOKENS   = 4096
 CUTOFF_HOURS = 24
 MAX_PER_FEED = 10   # articles per feed passed to Claude
