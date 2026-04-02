@@ -318,6 +318,9 @@ def main():
     print("Calling OpenRouter...")
     digest = call_llm(system, content)
     print(f"Got {len(digest)} chars from Claude")
+    print("--- LLM output (first 800 chars) ---")
+    print(digest[:800])
+    print("---")
 
     run_url = os.environ.get("RUN_URL", "")
     html    = wrap_email(md_to_html(digest), now_str, run_url)
