@@ -4,6 +4,7 @@ import json
 import os
 import re
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from xml.etree import ElementTree as ET
@@ -262,8 +263,12 @@ def send_email(subject, html, text):
             "Content-Type":   "application/json",
         },
     )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        resp = json.loads(r.read())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            resp = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        raise RuntimeError(f"Resend {e.code}: {body}") from e
     if "id" not in resp:
         raise RuntimeError(f"Unexpected Resend response: {resp}")
     print(f"Email sent. Resend ID: {resp['id']}")
