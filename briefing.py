@@ -20,9 +20,7 @@ FEEDS = {
         "https://www.dailymail.co.uk/news/index.rss",
     ],
     "Technology": [
-        "https://www.wired.com/feed/rss",
         "https://techcrunch.com/feed/",
-        "https://feeds.arstechnica.com/arstechnica/index",
         "https://www.theverge.com/rss/index.xml",
     ],
     "Product Hunt": [
