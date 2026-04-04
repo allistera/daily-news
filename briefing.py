@@ -22,6 +22,9 @@ FEEDS = {
     "Technology": [
         "https://techcrunch.com/feed/",
         "https://www.theverge.com/rss/index.xml",
+        "https://www.theregister.com/headlines.rss",
+        "https://www.engadget.com/rss.xml",
+        "https://venturebeat.com/feed/",
     ],
     "Product Hunt": [
         "https://www.producthunt.com/feed",
@@ -36,7 +39,7 @@ MODEL        = "google/gemini-2.5-flash"
 MAX_TOKENS   = 4096
 CUTOFF_HOURS = 24
 MAX_PER_FEED  = 10   # articles per feed passed to Claude
-FEED_LIMITS   = {"Product Hunt": 5}
+FEED_LIMITS   = {"Product Hunt": 5, "Technology": 25}
 HN_COUNT     = 5
 
 # ---------------------------------------------------------------------------
