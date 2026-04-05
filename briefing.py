@@ -192,7 +192,7 @@ def fetch_reddit(cutoff):
         return []
 
     req = urllib.request.Request(
-        "https://oauth.reddit.com/best?sort=top&t=day&limit=50",
+        "https://oauth.reddit.com/top?t=day&limit=50",
         headers={
             "Authorization": f"Bearer {token}",
             "User-Agent":    "daily-news-briefing/1.0",
