@@ -17,7 +17,11 @@ jobs:
 
       - name: Send daily briefing
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          RESEND_API_KEY:    ${{ secrets.RESEND_API_KEY }}
-          RUN_URL:           "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          OPENROUTER_API_KEY:  ${{ secrets.OPENROUTER_API_KEY }}
+          RESEND_API_KEY:     ${{ secrets.RESEND_API_KEY }}
+          REDDIT_CLIENT_ID:   ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_USERNAME:    ${{ secrets.REDDIT_USERNAME }}
+          REDDIT_PASSWORD:    ${{ secrets.REDDIT_PASSWORD }}
+          RUN_URL:            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         run: python3 briefing.py
