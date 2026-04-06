@@ -154,13 +154,24 @@ def fetch_hn(cutoff):
 # ---------------------------------------------------------------------------
 
 def _reddit_access_token():
-    """Obtain a Reddit OAuth access token using script-app credentials."""
-    client_id     = os.environ.get("REDDIT_CLIENT_ID", "")
-    client_secret = os.environ.get("REDDIT_CLIENT_SECRET", "")
-    username      = os.environ.get("REDDIT_USERNAME", "")
-    password      = os.environ.get("REDDIT_PASSWORD", "")
-    if not all([client_id, client_secret, username, password]):
-        return None
+    """Obtain a Reddit OAuth access token using script-app credentials.
+
+    Returns (token_or_none, missing_vars) where missing_vars is a list of
+    the env-var names that were empty/unset.
+    """
+    client_id     = os.environ.get("REDDIT_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("REDDIT_CLIENT_SECRET", "").strip()
+    username      = os.environ.get("REDDIT_USERNAME", "").strip()
+    password      = os.environ.get("REDDIT_PASSWORD", "").strip()
+
+    missing = [name for name, val in [
+        ("REDDIT_CLIENT_ID",     client_id),
+        ("REDDIT_CLIENT_SECRET", client_secret),
+        ("REDDIT_USERNAME",      username),
+        ("REDDIT_PASSWORD",      password),
+    ] if not val]
+    if missing:
+        return None, missing
 
     data = urllib.parse.urlencode({
         "grant_type": "password",
@@ -177,18 +188,24 @@ def _reddit_access_token():
     req.add_header("Authorization", f"Basic {credentials}")
 
     with urllib.request.urlopen(req, timeout=15) as r:
-        return json.loads(r.read()).get("access_token")
+        resp = json.loads(r.read())
+    token = resp.get("access_token")
+    if not token:
+        # Reddit returned a response but no token — surface the error field
+        error = resp.get("error", "unknown error")
+        raise RuntimeError(f"Reddit OAuth returned no token: {error}")
+    return token, []
 
 
 def fetch_reddit(cutoff):
     """Fetch top posts from the user's personal Reddit feed in the last 24h."""
     try:
-        token = _reddit_access_token()
+        token, missing = _reddit_access_token()
     except Exception as e:
         print(f"  WARN: Reddit auth failed: {e}")
         return []
-    if not token:
-        print("  WARN: Reddit credentials not configured, skipping")
+    if missing:
+        print(f"  WARN: Reddit credentials not configured, skipping (missing: {', '.join(missing)})")
         return []
 
     req = urllib.request.Request(
