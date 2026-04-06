@@ -371,9 +371,19 @@ def build_content(cutoff):
     reddit = fetch_reddit(cutoff)
     if reddit:
         lines = ["## Reddit"]
-        for r in reddit:
-            lines.append(f"- [{r['title']}]({r['url']}) — r/{r['sub']}, {r['score']} upvotes, {r['comments']} comments")
-        sections.append("\n".join(lines))
+        for post in reddit:
+            title = post.get("title", "").strip()
+            url = post.get("url", "").strip()
+            if not title or not url:
+                continue
+            sub = post.get("sub", "?")
+            score = post.get("score", "?")
+            comments = post.get("comments", "?")
+            lines.append(
+                f"- [{title}]({url}) — r/{sub}, {score} upvotes, {comments} comments"
+            )
+        if len(lines) > 1:
+            sections.append("\n".join(lines))
 
     return "\n\n".join(sections)
 
