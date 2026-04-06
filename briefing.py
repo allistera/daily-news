@@ -324,7 +324,7 @@ def build_content(cutoff):
     if reddit:
         lines = ["## Reddit"]
         for r in reddit:
-            lines.append(f"- [{r['title']}]({r['url']}) — r/{r['sub']}, {r['score']} upvotes, {r['comments']} comments")
+            lines.append(f"- [{r['title']}]({r['url']})")
         sections.append("\n".join(lines))
 
     return "\n\n".join(sections)
