@@ -43,7 +43,7 @@ MAX_PER_FEED  = 10   # articles per feed passed to Claude
 FEED_LIMITS   = {"Product Hunt": 5, "Technology": 25}
 HN_COUNT     = 5
 REDDIT_COUNT = 10
-REDDIT_RSS   = "https://old.reddit.com/.rss?feed=515128bf93b37729df51403d57c58993fa172039&user=allyant"
+REDDIT_RSS   = "https://old.reddit.com/.rss?feed=515128bf93b37729df51403d57c58993fa172039&user=allyant&t=day"
 
 # ---------------------------------------------------------------------------
 # RSS helpers
