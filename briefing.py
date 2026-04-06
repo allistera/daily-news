@@ -4,7 +4,6 @@ import json
 import os
 import re
 import time
-import base64
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -44,6 +43,7 @@ MAX_PER_FEED  = 10   # articles per feed passed to Claude
 FEED_LIMITS   = {"Product Hunt": 5, "Technology": 25}
 HN_COUNT     = 5
 REDDIT_COUNT = 10
+REDDIT_RSS   = "https://old.reddit.com/.rss?feed=515128bf93b37729df51403d57c58993fa172039&user=allyant&t=day"
 
 # ---------------------------------------------------------------------------
 # RSS helpers
@@ -150,77 +150,12 @@ def fetch_hn(cutoff):
 
 
 # ---------------------------------------------------------------------------
-# Reddit (personal feed, OAuth)
+# Reddit (personal RSS feed)
 # ---------------------------------------------------------------------------
 
-def _reddit_access_token():
-    """Obtain a Reddit OAuth access token using script-app credentials."""
-    client_id     = os.environ.get("REDDIT_CLIENT_ID", "")
-    client_secret = os.environ.get("REDDIT_CLIENT_SECRET", "")
-    username      = os.environ.get("REDDIT_USERNAME", "")
-    password      = os.environ.get("REDDIT_PASSWORD", "")
-    if not all([client_id, client_secret, username, password]):
-        return None
-
-    data = urllib.parse.urlencode({
-        "grant_type": "password",
-        "username":   username,
-        "password":   password,
-    }).encode()
-    req = urllib.request.Request(
-        "https://www.reddit.com/api/v1/access_token",
-        data=data,
-        headers={"User-Agent": "daily-news-briefing/1.0"},
-    )
-    # HTTP Basic auth with client_id:client_secret
-    credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    req.add_header("Authorization", f"Basic {credentials}")
-
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return json.loads(r.read()).get("access_token")
-
-
 def fetch_reddit(cutoff):
-    """Fetch top posts from the user's personal Reddit feed in the last 24h."""
-    try:
-        token = _reddit_access_token()
-    except Exception as e:
-        print(f"  WARN: Reddit auth failed: {e}")
-        return []
-    if not token:
-        print("  WARN: Reddit credentials not configured, skipping")
-        return []
-
-    req = urllib.request.Request(
-        "https://oauth.reddit.com/top?t=day&limit=50",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "User-Agent":    "daily-news-briefing/1.0",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            data = json.loads(r.read())
-    except Exception as e:
-        print(f"  WARN: Reddit fetch failed: {e}")
-        return []
-
-    cutoff_ts = cutoff.timestamp()
-    posts = []
-    for child in data.get("data", {}).get("children", []):
-        p = child.get("data", {})
-        if p.get("created_utc", 0) < cutoff_ts:
-            continue
-        posts.append({
-            "title":    p.get("title", "Untitled"),
-            "url":      f"https://reddit.com{p.get('permalink', '')}",
-            "score":    p.get("score", 0),
-            "comments": p.get("num_comments", 0),
-            "sub":      p.get("subreddit", ""),
-        })
-
-    posts.sort(key=lambda x: x["score"], reverse=True)
-    return posts[:REDDIT_COUNT]
+    """Fetch posts from the user's personal Reddit RSS feed."""
+    return fetch_feed(REDDIT_RSS, cutoff)[:REDDIT_COUNT]
 
 
 # ---------------------------------------------------------------------------
