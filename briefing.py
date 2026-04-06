@@ -4,7 +4,6 @@ import json
 import os
 import re
 import time
-import base64
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -44,6 +43,7 @@ MAX_PER_FEED  = 10   # articles per feed passed to Claude
 FEED_LIMITS   = {"Product Hunt": 5, "Technology": 25}
 HN_COUNT     = 5
 REDDIT_COUNT = 10
+REDDIT_RSS   = "https://old.reddit.com/.rss?feed=515128bf93b37729df51403d57c58993fa172039&user=allyant"
 
 # ---------------------------------------------------------------------------
 # RSS helpers
@@ -150,94 +150,12 @@ def fetch_hn(cutoff):
 
 
 # ---------------------------------------------------------------------------
-# Reddit (personal feed, OAuth)
+# Reddit (personal RSS feed)
 # ---------------------------------------------------------------------------
 
-def _reddit_access_token():
-    """Obtain a Reddit OAuth access token using script-app credentials.
-
-    Returns (token_or_none, missing_vars) where missing_vars is a list of
-    the env-var names that were empty/unset.
-    """
-    client_id     = os.environ.get("REDDIT_CLIENT_ID", "").strip()
-    client_secret = os.environ.get("REDDIT_CLIENT_SECRET", "").strip()
-    username      = os.environ.get("REDDIT_USERNAME", "").strip()
-    password      = os.environ.get("REDDIT_PASSWORD", "").strip()
-
-    missing = [name for name, val in [
-        ("REDDIT_CLIENT_ID",     client_id),
-        ("REDDIT_CLIENT_SECRET", client_secret),
-        ("REDDIT_USERNAME",      username),
-        ("REDDIT_PASSWORD",      password),
-    ] if not val]
-    if missing:
-        return None, missing
-
-    data = urllib.parse.urlencode({
-        "grant_type": "password",
-        "username":   username,
-        "password":   password,
-    }).encode()
-    req = urllib.request.Request(
-        "https://www.reddit.com/api/v1/access_token",
-        data=data,
-        headers={"User-Agent": "daily-news-briefing/1.0"},
-    )
-    # HTTP Basic auth with client_id:client_secret
-    credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    req.add_header("Authorization", f"Basic {credentials}")
-
-    with urllib.request.urlopen(req, timeout=15) as r:
-        resp = json.loads(r.read())
-    token = resp.get("access_token")
-    if not token:
-        # Reddit returned a response but no token — surface the error field
-        error = resp.get("error", "unknown error")
-        raise RuntimeError(f"Reddit OAuth returned no token: {error}")
-    return token, []
-
-
 def fetch_reddit(cutoff):
-    """Fetch top posts from the user's personal Reddit feed in the last 24h."""
-    try:
-        token, missing = _reddit_access_token()
-    except Exception as e:
-        print(f"  WARN: Reddit auth failed: {e}")
-        return []
-    if missing:
-        print(f"  WARN: Reddit credentials not configured, skipping (missing: {', '.join(missing)})")
-        return []
-
-    req = urllib.request.Request(
-        "https://oauth.reddit.com/top?t=day&limit=50",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "User-Agent":    "daily-news-briefing/1.0",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            data = json.loads(r.read())
-    except Exception as e:
-        print(f"  WARN: Reddit fetch failed: {e}")
-        return []
-
-    cutoff_ts = cutoff.timestamp()
-    posts = []
-    for child in data.get("data", {}).get("children", []):
-        p = child.get("data", {})
-        if p.get("created_utc", 0) < cutoff_ts:
-            continue
-        posts.append({
-            "title":    p.get("title", "Untitled"),
-            "url":      f"https://reddit.com{p.get('permalink', '')}",
-            "score":    p.get("score", 0),
-            "comments": p.get("num_comments", 0),
-            "sub":      p.get("subreddit", ""),
-        })
-
-    posts.sort(key=lambda x: x["score"], reverse=True)
-    return posts[:REDDIT_COUNT]
+    """Fetch posts from the user's personal Reddit RSS feed."""
+    return fetch_feed(REDDIT_RSS, cutoff)[:REDDIT_COUNT]
 
 
 # ---------------------------------------------------------------------------
