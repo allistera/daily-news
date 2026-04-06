@@ -1,5 +1,6 @@
 """Daily news briefing: fetch RSS + HN → OpenRouter → Resend."""
 
+import html
 import json
 import os
 import re
@@ -153,9 +154,56 @@ def fetch_hn(cutoff):
 # Reddit (personal RSS feed)
 # ---------------------------------------------------------------------------
 
+def _reddit_sub_from_url(url):
+    m = re.search(r"/r/([^/]+)/", url or "")
+    return m.group(1) if m else "?"
+
+
+def _reddit_parse_stats(description_html):
+    """Best-effort score and comment counts from Reddit RSS <description> HTML."""
+    text = html.unescape(description_html or "")
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    score_m = re.search(r"([\d,]+)\s+points?", text, re.I)
+    comments_m = re.search(r"([\d,]+)\s+comments?", text, re.I)
+    score = score_m.group(1).replace(",", "") if score_m else "?"
+    comments = comments_m.group(1).replace(",", "") if comments_m else "?"
+    return score, comments
+
+
 def fetch_reddit(cutoff):
-    """Fetch posts from the user's personal Reddit RSS feed."""
-    return fetch_feed(REDDIT_RSS, cutoff)[:REDDIT_COUNT]
+    """Fetch posts from the user's personal Reddit RSS feed (enriched metadata)."""
+    try:
+        req = urllib.request.Request(REDDIT_RSS, headers={"User-Agent": RSS_UA})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            root = ET.fromstring(r.read())
+    except Exception as e:
+        print(f"  WARN: could not fetch Reddit: {e}")
+        return []
+
+    results = []
+    for item in root.findall(".//item"):
+        raw_date = item.findtext("pubDate") or ""
+        dt = _parse_date(raw_date)
+        if dt and dt < cutoff:
+            continue
+
+        title = (item.findtext("title") or "").strip()
+        link = (item.findtext("link") or "").strip()
+        if not title or not link:
+            continue
+
+        desc = item.findtext("description") or ""
+        score, comments = _reddit_parse_stats(desc)
+        results.append({
+            "title":    title,
+            "url":      link,
+            "sub":      _reddit_sub_from_url(link),
+            "score":    score,
+            "comments": comments,
+        })
+
+    return results[:REDDIT_COUNT]
 
 
 # ---------------------------------------------------------------------------
