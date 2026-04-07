@@ -181,19 +181,40 @@ def fetch_reddit(cutoff):
         print(f"  WARN: could not fetch Reddit: {e}")
         return []
 
+    # Reddit personal feeds are Atom in most cases, but support RSS too.
+    entries = root.findall(".//item") or root.findall(".//{http://www.w3.org/2005/Atom}entry")
+
     results = []
-    for item in root.findall(".//item"):
-        raw_date = item.findtext("pubDate") or ""
+    for item in entries:
+        raw_date = (
+            item.findtext("pubDate")
+            or item.findtext("{http://www.w3.org/2005/Atom}updated")
+            or item.findtext("{http://www.w3.org/2005/Atom}published")
+            or ""
+        )
         dt = _parse_date(raw_date)
         if dt and dt < cutoff:
             continue
 
-        title = (item.findtext("title") or "").strip()
+        title = (
+            item.findtext("title")
+            or item.findtext("{http://www.w3.org/2005/Atom}title")
+            or ""
+        ).strip()
         link = (item.findtext("link") or "").strip()
+        if not link:
+            link_el = item.find("{http://www.w3.org/2005/Atom}link")
+            if link_el is not None:
+                link = (link_el.get("href") or "").strip()
         if not title or not link:
             continue
 
-        desc = item.findtext("description") or ""
+        desc = (
+            item.findtext("description")
+            or item.findtext("{http://www.w3.org/2005/Atom}content")
+            or item.findtext("{http://www.w3.org/2005/Atom}summary")
+            or ""
+        )
         score, comments = _reddit_parse_stats(desc)
         results.append({
             "title":    title,
