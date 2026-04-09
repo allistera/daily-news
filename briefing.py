@@ -4,7 +4,6 @@ import html
 import json
 import os
 import re
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -52,6 +51,7 @@ REDDIT_RSS   = "https://old.reddit.com/top/.rss?feed=515128bf93b37729df51403d57c
 
 NS = {"dc": "http://purl.org/dc/elements/1.1/", "atom": "http://www.w3.org/2005/Atom"}
 
+
 def _parse_date(text):
     """Parse RFC 2822 or ISO 8601 date strings; return UTC-aware datetime or None."""
     if not text:
@@ -78,6 +78,7 @@ RSS_UA = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/124.0.0.0 Safari/537.36"
 )
+
 
 def fetch_feed(url, cutoff):
     """Return list of {title, url} dicts published after cutoff."""
@@ -277,16 +278,22 @@ def md_to_html(md):
     for line in md.split("\n"):
         s = line.strip()
         if line.startswith("## "):
-            if in_list: html.append("</ul>"); in_list = False
+            if in_list:
+                html.append("</ul>")
+                in_list = False
             html.append(f'<h2 style="font-size:13px;font-weight:700;text-transform:uppercase;'
                         f'letter-spacing:.07em;color:#888;margin:36px 0 12px;'
                         f'padding-bottom:6px;border-bottom:2px solid #eee;">{esc(line[3:])}</h2>')
         elif line.startswith("# "):
-            if in_list: html.append("</ul>"); in_list = False
+            if in_list:
+                html.append("</ul>")
+                in_list = False
             html.append(f'<h1 style="font-size:18px;font-weight:700;color:#000;margin:32px 0 10px;">'
                         f'{esc(line[2:])}</h1>')
         elif bold_link.match(s) or (bold_text.match(s) and not line.startswith("-")):
-            if in_list: html.append("</ul>"); in_list = False
+            if in_list:
+                html.append("</ul>")
+                in_list = False
             html.append(f'<p style="margin:16px 0 4px;font-size:16px;font-weight:600;line-height:1.4;">'
                         f'{inline(esc(s))}</p>')
         elif line.startswith("- ") or line.startswith("* "):
@@ -296,10 +303,15 @@ def md_to_html(md):
             html.append(f'<li style="margin:2px 0;font-size:13px;color:#555;line-height:1.5;">'
                         f'{inline(esc(line[2:]))}</li>')
         elif not s or s == "---":
-            if in_list: html.append("</ul>"); in_list = False
-            if not s: html.append('<div style="height:4px;"></div>')
+            if in_list:
+                html.append("</ul>")
+                in_list = False
+            if not s:
+                html.append('<div style="height:4px;"></div>')
         else:
-            if in_list: html.append("</ul>"); in_list = False
+            if in_list:
+                html.append("</ul>")
+                in_list = False
             html.append(f'<p style="margin:0 0 8px;font-size:14px;color:#333;line-height:1.6;">'
                         f'{inline(esc(line))}</p>')
 
