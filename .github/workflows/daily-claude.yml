@@ -2,8 +2,7 @@ name: Daily News Briefing
 
 on:
   schedule:
-    - cron: "30 9 * * *"   # 10:30 BST (summer)
-    - cron: "30 10 * * *"  # 10:30 GMT (winter)
+    - cron: "30 9 * * *"   # 10:30 BST / 09:30 GMT
   workflow_dispatch:
 
 jobs:
