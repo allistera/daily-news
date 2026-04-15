@@ -136,8 +136,12 @@ def fetch_hn(cutoff):
         f"https://hn.algolia.com/api/v1/search_by_date"
         f"?tags=story&numericFilters=created_at_i>{since}&hitsPerPage=200"
     )
-    with urllib.request.urlopen(url, timeout=15) as r:
-        data = json.loads(r.read())
+    try:
+        with urllib.request.urlopen(url, timeout=15) as r:
+            data = json.loads(r.read())
+    except Exception as e:
+        print(f"  WARN: could not fetch Hacker News: {e}")
+        return []
 
     hits = sorted(data["hits"], key=lambda h: h.get("points", 0), reverse=True)[:HN_COUNT]
     return [
