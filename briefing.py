@@ -386,6 +386,7 @@ def send_email(subject, html, text):
 
 def build_content(cutoff):
     sections = []
+    article_count = 0
 
     for section, urls in FEEDS.items():
         limit = FEED_LIMITS.get(section, MAX_PER_FEED)
@@ -394,6 +395,7 @@ def build_content(cutoff):
             articles.extend(fetch_feed(url, cutoff))
         articles = articles[:limit]
         if articles:
+            article_count += len(articles)
             lines = [f"## {section}"]
             for a in articles:
                 lines.append(f"- [{a['title']}]({a['url']})")
@@ -402,6 +404,7 @@ def build_content(cutoff):
     # Hacker News
     hn = fetch_hn(cutoff)
     if hn:
+        article_count += len(hn)
         lines = ["## Hacker News"]
         for h in hn:
             lines.append(f"- [{h['title']}]({h['url']}) — {h['points']} points, {h['comments']} comments")
@@ -423,9 +426,10 @@ def build_content(cutoff):
                 f"- [{title}]({url}) — r/{sub}, {score} upvotes, {comments} comments"
             )
         if len(lines) > 1:
+            article_count += len(lines) - 1  # subtract the "## Reddit" header
             sections.append("\n".join(lines))
 
-    return "\n\n".join(sections)
+    return "\n\n".join(sections), article_count
 
 
 def main():
@@ -433,8 +437,8 @@ def main():
     now_str = datetime.now(timezone.utc).strftime("%A, %d %B %Y")
 
     print("Fetching articles...")
-    content = build_content(cutoff)
-    print(f"Fetched {content.count(chr(10))} lines of content")
+    content, article_count = build_content(cutoff)
+    print(f"Fetched {article_count} articles")
 
     system = open("prompt.txt").read().strip()
 
