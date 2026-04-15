@@ -499,5 +499,41 @@ def main():
     send_email(subject, html, digest)
 
 
+def send_failure_alert(error_msg):
+    """Send a short alert email if the pipeline fails."""
+    resend_key = os.environ.get("RESEND_API_KEY")
+    if not resend_key:
+        print("No RESEND_API_KEY — cannot send failure alert")
+        return
+    payload = json.dumps({
+        "from":    "Daily News <reports@infinitywave.design>",
+        "to":      ["me@allisterantosik.com"],
+        "subject": "Daily News pipeline failed",
+        "text":    f"The daily news pipeline failed:\n\n{error_msg}",
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {resend_key}",
+            "Content-Type":  "application/json",
+            "User-Agent":    "curl/8.7.1",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            json.loads(r.read())
+        print("Failure alert sent.")
+    except Exception as e:
+        print(f"Could not send failure alert: {e}")
+
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        import traceback
+        msg = traceback.format_exc()
+        print(f"FATAL: {exc}\n{msg}")
+        send_failure_alert(msg)
+        raise
