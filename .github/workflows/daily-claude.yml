@@ -9,7 +9,7 @@ jobs:
   send-briefing:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -20,3 +20,11 @@ jobs:
           RESEND_API_KEY:     ${{ secrets.RESEND_API_KEY }}
           RUN_URL:            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         run: python3 briefing.py
+
+      - name: Commit seen.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen.json
+          git diff --cached --quiet || git commit -m "chore: update seen.json [skip ci]"
+          git push

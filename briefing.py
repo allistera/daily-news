@@ -3,6 +3,7 @@
 import html
 import json
 import os
+import pathlib
 import re
 import urllib.error
 import urllib.parse
@@ -47,6 +48,39 @@ FEED_LIMITS   = {"Product Hunt": 5, "Technology": 25}
 HN_COUNT     = 5
 REDDIT_COUNT = 10
 REDDIT_RSS   = "https://old.reddit.com/top/.rss?feed=515128bf93b37729df51403d57c58993fa172039&user=allyant&t=day"
+SEEN_FILE    = pathlib.Path("seen.json")
+SEEN_MAX_AGE = timedelta(days=7)   # evict URLs older than this
+
+# ---------------------------------------------------------------------------
+# Seen-URL deduplication (cross-run)
+# ---------------------------------------------------------------------------
+
+def load_seen():
+    """Return {url: iso-timestamp} from seen.json, or {} if missing/corrupt."""
+    try:
+        return json.loads(SEEN_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def save_seen(seen):
+    """Write seen dict to seen.json, evicting entries older than SEEN_MAX_AGE."""
+    cutoff = (datetime.now(timezone.utc) - SEEN_MAX_AGE).isoformat()
+    fresh = {url: ts for url, ts in seen.items() if ts >= cutoff}
+    SEEN_FILE.write_text(json.dumps(fresh, indent=2))
+
+
+def filter_seen(items, seen):
+    """Remove items whose 'url' key already appears in seen; mark survivors."""
+    now = datetime.now(timezone.utc).isoformat()
+    new_items = []
+    for item in items:
+        url = item.get("url", "")
+        if url and url not in seen:
+            seen[url] = now
+            new_items.append(item)
+    return new_items
+
 
 # ---------------------------------------------------------------------------
 # RSS helpers
@@ -384,7 +418,7 @@ def send_email(subject, html, text):
 # Main
 # ---------------------------------------------------------------------------
 
-def build_content(cutoff):
+def build_content(cutoff, seen):
     sections = []
     article_count = 0
 
@@ -393,7 +427,7 @@ def build_content(cutoff):
         articles = []
         for url in urls:
             articles.extend(fetch_feed(url, cutoff))
-        articles = articles[:limit]
+        articles = filter_seen(articles[:limit], seen)
         if articles:
             article_count += len(articles)
             lines = [f"## {section}"]
@@ -402,7 +436,7 @@ def build_content(cutoff):
             sections.append("\n".join(lines))
 
     # Hacker News
-    hn = fetch_hn(cutoff)
+    hn = filter_seen(fetch_hn(cutoff), seen)
     if hn:
         article_count += len(hn)
         lines = ["## Hacker News"]
@@ -411,7 +445,7 @@ def build_content(cutoff):
         sections.append("\n".join(lines))
 
     # Reddit (personal feed)
-    reddit = fetch_reddit(cutoff)
+    reddit = filter_seen(fetch_reddit(cutoff), seen)
     if reddit:
         lines = ["## Reddit"]
         for post in reddit:
@@ -436,9 +470,11 @@ def main():
     cutoff  = datetime.now(timezone.utc) - timedelta(hours=CUTOFF_HOURS)
     now_str = datetime.now(timezone.utc).strftime("%A, %d %B %Y")
 
+    seen = load_seen()
     print("Fetching articles...")
-    content, article_count = build_content(cutoff)
-    print(f"Fetched {article_count} articles")
+    content, article_count = build_content(cutoff, seen)
+    save_seen(seen)
+    print(f"Fetched {article_count} new articles")
 
     system = open("prompt.txt").read().strip()
 
