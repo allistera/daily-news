@@ -274,50 +274,50 @@ def md_to_html(md):
     bold_link = re.compile(r'^\*\*\[.+\]\(https?://.+\)\*\*$')
     bold_text = re.compile(r'^\*\*[^*]+\*\*$')
 
-    html, in_list = [], False
+    out, in_list = [], False
     for line in md.split("\n"):
         s = line.strip()
         if line.startswith("## "):
             if in_list:
-                html.append("</ul>")
+                out.append("</ul>")
                 in_list = False
-            html.append(f'<h2 style="font-size:13px;font-weight:700;text-transform:uppercase;'
-                        f'letter-spacing:.07em;color:#888;margin:36px 0 12px;'
-                        f'padding-bottom:6px;border-bottom:2px solid #eee;">{esc(line[3:])}</h2>')
+            out.append(f'<h2 style="font-size:13px;font-weight:700;text-transform:uppercase;'
+                       f'letter-spacing:.07em;color:#888;margin:36px 0 12px;'
+                       f'padding-bottom:6px;border-bottom:2px solid #eee;">{esc(line[3:])}</h2>')
         elif line.startswith("# "):
             if in_list:
-                html.append("</ul>")
+                out.append("</ul>")
                 in_list = False
-            html.append(f'<h1 style="font-size:18px;font-weight:700;color:#000;margin:32px 0 10px;">'
-                        f'{esc(line[2:])}</h1>')
+            out.append(f'<h1 style="font-size:18px;font-weight:700;color:#000;margin:32px 0 10px;">'
+                       f'{esc(line[2:])}</h1>')
         elif bold_link.match(s) or (bold_text.match(s) and not line.startswith("-")):
             if in_list:
-                html.append("</ul>")
+                out.append("</ul>")
                 in_list = False
-            html.append(f'<p style="margin:16px 0 4px;font-size:16px;font-weight:600;line-height:1.4;">'
-                        f'{inline(esc(s))}</p>')
+            out.append(f'<p style="margin:16px 0 4px;font-size:16px;font-weight:600;line-height:1.4;">'
+                       f'{inline(esc(s))}</p>')
         elif line.startswith("- ") or line.startswith("* "):
             if not in_list:
-                html.append('<ul style="margin:2px 0 10px;padding-left:16px;list-style:none;">')
+                out.append('<ul style="margin:2px 0 10px;padding-left:16px;list-style:none;">')
                 in_list = True
-            html.append(f'<li style="margin:2px 0;font-size:13px;color:#555;line-height:1.5;">'
-                        f'{inline(esc(line[2:]))}</li>')
+            out.append(f'<li style="margin:2px 0;font-size:13px;color:#555;line-height:1.5;">'
+                       f'{inline(esc(line[2:]))}</li>')
         elif not s or s == "---":
             if in_list:
-                html.append("</ul>")
+                out.append("</ul>")
                 in_list = False
             if not s:
-                html.append('<div style="height:4px;"></div>')
+                out.append('<div style="height:4px;"></div>')
         else:
             if in_list:
-                html.append("</ul>")
+                out.append("</ul>")
                 in_list = False
-            html.append(f'<p style="margin:0 0 8px;font-size:14px;color:#333;line-height:1.6;">'
-                        f'{inline(esc(line))}</p>')
+            out.append(f'<p style="margin:0 0 8px;font-size:14px;color:#333;line-height:1.6;">'
+                       f'{inline(esc(line))}</p>')
 
     if in_list:
-        html.append("</ul>")
-    return "\n".join(html)
+        out.append("</ul>")
+    return "\n".join(out)
 
 
 def wrap_email(body_html, date_str, run_url):
