@@ -39,7 +39,10 @@ FEEDS = {
 MODEL        = "google/gemini-2.5-flash"
 MAX_TOKENS   = 4096
 CUTOFF_HOURS = 24
-MAX_PER_FEED  = 10   # articles per feed passed to Claude
+MAX_PER_FEED  = 10   # max articles returned per individual feed URL
+# Per-section caps applied after all feeds in a section are combined.
+# Sections not listed here are capped at MAX_PER_FEED per feed with no
+# combined cap (e.g. Smart Home: 2 feeds × 10 = up to 20 articles).
 FEED_LIMITS   = {"Product Hunt": 5, "Technology": 25}
 HN_COUNT     = 5
 REDDIT_COUNT = 10
