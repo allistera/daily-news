@@ -37,7 +37,10 @@ FEEDS = {
     ],
 }
 
-MODEL        = "google/gemini-2.5-flash"
+MODEL        = "google/gemini-2.5-flash"      # default (analysis-heavy sections)
+MODEL_FAST   = "google/gemini-2.0-flash-001"  # cheaper (list-heavy sections)
+# Sections that only need a bullet-list summary get the faster/cheaper model.
+FAST_SECTIONS = {"Product Hunt", "Reddit", "Smart Home"}
 MAX_TOKENS   = 4096
 CUTOFF_HOURS = 24
 MAX_PER_FEED  = 10   # max articles returned per individual feed URL
@@ -273,9 +276,9 @@ def fetch_reddit(cutoff):
 # OpenRouter
 # ---------------------------------------------------------------------------
 
-def call_llm(system, user):
+def call_llm(system, user, model=None):
     payload = json.dumps({
-        "model":      MODEL,
+        "model":      model or MODEL,
         "max_tokens": MAX_TOKENS,
         "messages":   [
             {"role": "system", "content": system},
@@ -418,9 +421,9 @@ def send_email(subject, html, text):
 # Main
 # ---------------------------------------------------------------------------
 
-def build_content(cutoff, seen):
+def build_sections(cutoff, seen):
+    """Return list of (section_name, content_str, article_count) tuples."""
     sections = []
-    article_count = 0
 
     for section, urls in FEEDS.items():
         limit = FEED_LIMITS.get(section, MAX_PER_FEED)
@@ -429,20 +432,18 @@ def build_content(cutoff, seen):
             articles.extend(fetch_feed(url, cutoff))
         articles = filter_seen(articles[:limit], seen)
         if articles:
-            article_count += len(articles)
             lines = [f"## {section}"]
             for a in articles:
                 lines.append(f"- [{a['title']}]({a['url']})")
-            sections.append("\n".join(lines))
+            sections.append((section, "\n".join(lines), len(articles)))
 
     # Hacker News
     hn = filter_seen(fetch_hn(cutoff), seen)
     if hn:
-        article_count += len(hn)
         lines = ["## Hacker News"]
         for h in hn:
             lines.append(f"- [{h['title']}]({h['url']}) — {h['points']} points, {h['comments']} comments")
-        sections.append("\n".join(lines))
+        sections.append(("Hacker News", "\n".join(lines), len(hn)))
 
     # Reddit (personal feed)
     reddit = filter_seen(fetch_reddit(cutoff), seen)
@@ -460,10 +461,9 @@ def build_content(cutoff, seen):
                 f"- [{title}]({url}) — r/{sub}, {score} upvotes, {comments} comments"
             )
         if len(lines) > 1:
-            article_count += len(lines) - 1  # subtract the "## Reddit" header
-            sections.append("\n".join(lines))
+            sections.append(("Reddit", "\n".join(lines), len(lines) - 1))
 
-    return "\n\n".join(sections), article_count
+    return sections
 
 
 def main():
@@ -472,15 +472,21 @@ def main():
 
     seen = load_seen()
     print("Fetching articles...")
-    content, article_count = build_content(cutoff, seen)
+    sections = build_sections(cutoff, seen)
     save_seen(seen)
-    print(f"Fetched {article_count} new articles")
+    article_count = sum(c for _, _, c in sections)
+    print(f"Fetched {article_count} new articles across {len(sections)} sections")
 
     system = open("prompt.txt").read().strip()
 
-    print("Calling OpenRouter...")
-    digest = call_llm(system, content)
-    print(f"Got {len(digest)} chars from Claude")
+    print("Calling OpenRouter (per-section)...")
+    digest_parts = []
+    for section_name, content, count in sections:
+        model = MODEL_FAST if section_name in FAST_SECTIONS else MODEL
+        print(f"  {section_name}: {count} articles → {model}")
+        digest_parts.append(call_llm(system, content, model=model))
+    digest = "\n\n".join(digest_parts)
+    print(f"Got {len(digest)} chars total")
     print("--- LLM output (first 800 chars) ---")
     print(digest[:800])
     print("---")
