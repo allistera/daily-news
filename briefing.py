@@ -303,11 +303,21 @@ def call_llm(system, user, model=None):
 # ---------------------------------------------------------------------------
 
 def md_to_html(md):
-    def inline(text):
-        text = re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)',
-                      r'<a href="\2" style="color:#111;text-decoration:underline;">\1</a>', text)
+    title_style = (
+        "margin:16px 0 4px;font-size:16px;font-weight:600;"
+        "line-height:1.4;color:#111;"
+    )
+    title_link_style = "color:#111;text-decoration:underline;"
+    body_link_style = "color:#555;text-decoration:underline;"
+
+    def inline(text, link_style=body_link_style):
+        text = re.sub(
+            r'\[([^\]]+)\]\((https?://[^\)]+)\)',
+            rf'<a href="\2" style="{link_style}">\1</a>',
+            text,
+        )
         text = re.sub(r'(?<!["\(])(https?://\S+)',
-                      r'<a href="\1" style="color:#555;text-decoration:underline;">\1</a>', text)
+                      rf'<a href="\1" style="{body_link_style}">\1</a>', text)
         text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
         text = re.sub(r'\*(.+?)\*',     r'<em>\1</em>',         text)
         return text
@@ -338,8 +348,7 @@ def md_to_html(md):
             if in_list:
                 out.append("</ul>")
                 in_list = False
-            out.append(f'<p style="margin:16px 0 4px;font-size:16px;font-weight:600;line-height:1.4;">'
-                       f'{inline(esc(s))}</p>')
+            out.append(f'<p style="{title_style}">{inline(esc(s), link_style=title_link_style)}</p>')
         elif line.startswith("- ") or line.startswith("* "):
             if not in_list:
                 out.append('<ul style="margin:2px 0 10px;padding-left:16px;list-style:none;">')

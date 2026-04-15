@@ -7,6 +7,7 @@ For each section, select the 3–5 most significant stories and format them as:
 
 Rules:
 - Use ## for section headings, never ### for story titles
+- Format every story title exactly as `**[Full headline](url)**`; do not output plain bold titles
 - Favour original reporting over opinion, commentary, or listicles
 - Every headline must be a clickable markdown link — omit any story without a valid URL
 - Be concise and analytical
