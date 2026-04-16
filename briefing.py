@@ -325,8 +325,8 @@ def md_to_html(md):
     def esc(s):
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    bold_link = re.compile(r'^\*\*\[.+\]\(https?://.+\)\*\*$')
-    bold_text = re.compile(r'^\*\*[^*]+\*\*$')
+    bold_link = re.compile(r'^\*\*\[.+?\]\(https?://[^\)]+\)\*\*')
+    bold_text = re.compile(r'^\*\*[^*]+\*\*')
 
     out, in_list = [], False
     for line in md.split("\n"):
