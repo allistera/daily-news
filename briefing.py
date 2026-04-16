@@ -308,7 +308,7 @@ def md_to_html(md):
         "line-height:1.4;color:#111;"
     )
     title_link_style = "color:#111;text-decoration:underline;"
-    body_link_style = "color:#555;text-decoration:underline;"
+    body_link_style = "color:#111;text-decoration:underline;"
 
     def inline(text, link_style=body_link_style):
         text = re.sub(
