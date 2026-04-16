@@ -308,7 +308,7 @@ def md_to_html(md):
         "line-height:1.4;color:#111;"
     )
     title_link_style = "color:#111;text-decoration:underline;"
-    body_link_style = "color:#555;text-decoration:underline;"
+    body_link_style = "color:#111;text-decoration:underline;"
 
     def inline(text, link_style=body_link_style):
         text = re.sub(
@@ -325,8 +325,8 @@ def md_to_html(md):
     def esc(s):
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    bold_link = re.compile(r'^\*\*\[.+\]\(https?://.+\)\*\*$')
-    bold_text = re.compile(r'^\*\*[^*]+\*\*$')
+    bold_link = re.compile(r'^\*\*\[.+?\]\(https?://[^\)]+\)\*\*')
+    bold_text = re.compile(r'^\*\*[^*]+\*\*')
 
     out, in_list = [], False
     for line in md.split("\n"):
