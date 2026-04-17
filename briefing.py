@@ -5,9 +5,11 @@ import json
 import os
 import pathlib
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 from xml.etree import ElementTree as ET
 
@@ -476,24 +478,35 @@ def build_sections(cutoff, seen):
 
 
 def main():
+    t_start = time.time()
     cutoff  = datetime.now(timezone.utc) - timedelta(hours=CUTOFF_HOURS)
     now_str = datetime.now(timezone.utc).strftime("%A, %d %B %Y")
 
     seen = load_seen()
     print("Fetching articles...")
+    t_fetch = time.time()
     sections = build_sections(cutoff, seen)
     save_seen(seen)
     article_count = sum(c for _, _, c in sections)
-    print(f"Fetched {article_count} new articles across {len(sections)} sections")
+    print(f"Fetched {article_count} new articles across {len(sections)} sections in {time.time()-t_fetch:.1f}s")
 
     system = open("prompt.txt").read().strip()
 
-    print("Calling OpenRouter (per-section)...")
-    digest_parts = []
-    for section_name, content, count in sections:
+    print("Calling OpenRouter (parallel per-section)...")
+    t_llm = time.time()
+
+    def call_section(args):
+        section_name, content, count = args
         model = MODEL_FAST if section_name in FAST_SECTIONS else MODEL
-        print(f"  {section_name}: {count} articles → {model}")
-        digest_parts.append(call_llm(system, content, model=model))
+        t = time.time()
+        result = call_llm(system, content, model=model)
+        print(f"  {section_name}: {count} articles → {model} ({time.time()-t:.1f}s)")
+        return result
+
+    with ThreadPoolExecutor(max_workers=len(sections)) as ex:
+        digest_parts = list(ex.map(call_section, sections))
+
+    print(f"LLM calls done in {time.time()-t_llm:.1f}s")
     digest = "\n\n".join(digest_parts)
     print(f"Got {len(digest)} chars total")
     print("--- LLM output (first 800 chars) ---")
@@ -505,7 +518,10 @@ def main():
     subject = f"Daily News Briefing — {now_str}"
 
     print("Sending email...")
+    t_email = time.time()
     send_email(subject, html, digest)
+    print(f"Email sent in {time.time()-t_email:.1f}s")
+    print(f"Total pipeline time: {time.time()-t_start:.1f}s")
 
 
 def send_failure_alert(error_msg):
