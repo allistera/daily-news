@@ -44,6 +44,10 @@ MODEL_FAST   = "google/gemini-2.0-flash-001"  # cheaper (list-heavy sections)
 # Sections that only need a bullet-list summary get the faster/cheaper model.
 FAST_SECTIONS = {"Product Hunt", "Reddit", "Smart Home"}
 MAX_TOKENS   = 4096
+OPENROUTER_MAX_RETRIES = 4
+OPENROUTER_RETRY_DELAY = 5
+OPENROUTER_RETRYABLE_CODES = {429, 500, 502, 503, 504}
+MAX_LLM_WORKERS = 2
 CUTOFF_HOURS = 24
 MAX_PER_FEED  = 10   # max articles returned per individual feed URL
 # Per-section caps applied after all feeds in a section are combined.
@@ -278,6 +282,19 @@ def fetch_reddit(cutoff):
 # OpenRouter
 # ---------------------------------------------------------------------------
 
+def _retry_delay_from_error(error, attempt):
+    retry_after = None
+    headers = getattr(error, "headers", None)
+    if headers:
+        retry_after = headers.get("Retry-After")
+    if retry_after:
+        try:
+            return max(float(retry_after), OPENROUTER_RETRY_DELAY * attempt)
+        except ValueError:
+            pass
+    return OPENROUTER_RETRY_DELAY * attempt
+
+
 def call_llm(system, user, model=None):
     payload = json.dumps({
         "model":      model or MODEL,
@@ -288,16 +305,40 @@ def call_llm(system, user, model=None):
         ],
     }).encode()
 
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
-            "Content-Type":  "application/json",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=120) as r:
-        return json.loads(r.read())["choices"][0]["message"]["content"]
+    for attempt in range(1, OPENROUTER_MAX_RETRIES + 2):
+        req = urllib.request.Request(
+            "https://openrouter.ai/api/v1/chat/completions",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
+                "Content-Type":  "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                return json.loads(r.read())["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as error:
+            body = error.read().decode(errors="replace")
+            is_retryable = error.code in OPENROUTER_RETRYABLE_CODES
+            if not is_retryable or attempt > OPENROUTER_MAX_RETRIES:
+                raise RuntimeError(
+                    f"OpenRouter {error.code}: {body[:500] or error.reason}"
+                ) from error
+            delay = _retry_delay_from_error(error, attempt)
+            print(
+                f"  OpenRouter {error.code} ({error.reason}); "
+                f"retrying in {delay:.1f}s [{attempt}/{OPENROUTER_MAX_RETRIES}]"
+            )
+            time.sleep(delay)
+        except urllib.error.URLError as error:
+            if attempt > OPENROUTER_MAX_RETRIES:
+                raise RuntimeError(f"OpenRouter request failed: {error.reason}") from error
+            delay = OPENROUTER_RETRY_DELAY * attempt
+            print(
+                f"  OpenRouter network error ({error.reason}); "
+                f"retrying in {delay:.1f}s [{attempt}/{OPENROUTER_MAX_RETRIES}]"
+            )
+            time.sleep(delay)
 
 
 # ---------------------------------------------------------------------------
@@ -492,9 +533,6 @@ def main():
 
     system = open("prompt.txt").read().strip()
 
-    print("Calling OpenRouter (parallel per-section)...")
-    t_llm = time.time()
-
     def call_section(args):
         section_name, content, count = args
         model = MODEL_FAST if section_name in FAST_SECTIONS else MODEL
@@ -503,7 +541,11 @@ def main():
         print(f"  {section_name}: {count} articles → {model} ({time.time()-t:.1f}s)")
         return result
 
-    with ThreadPoolExecutor(max_workers=len(sections)) as ex:
+    worker_count = min(len(sections), MAX_LLM_WORKERS) or 1
+    print(f"Calling OpenRouter ({worker_count} workers max)...")
+    t_llm = time.time()
+
+    with ThreadPoolExecutor(max_workers=worker_count) as ex:
         digest_parts = list(ex.map(call_section, sections))
 
     print(f"LLM calls done in {time.time()-t_llm:.1f}s")
