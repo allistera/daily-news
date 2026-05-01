@@ -41,8 +41,24 @@ FEEDS = {
 
 MODEL        = "google/gemini-2.5-flash"      # default (analysis-heavy sections)
 MODEL_FAST   = "google/gemini-2.0-flash-001"  # cheaper (list-heavy sections)
+MODEL_PRIORITISER = "anthropic/claude-opus-4.7"  # final pass: prioritise + format
 # Sections that only need a bullet-list summary get the faster/cheaper model.
 FAST_SECTIONS = {"Product Hunt", "Reddit", "Smart Home"}
+
+PRIORITISER_PROMPT = """You are the final editor of a daily news briefing email.
+
+You will receive the full draft briefing as markdown, organised by section. Rewrite it as a single, polished briefing email that:
+
+1. Leads with a "## Top Stories" section containing the 3–6 most important items overall, ranked by importance to the reader. The reader's interests, in priority order, are:
+   - AI (models, research, products, industry moves)
+   - Vibe-coding (AI-assisted development tools, agents, IDEs)
+   - New Apps and product launches
+   - Breaking world news
+   Other topics should appear only if genuinely significant.
+2. Follows with the remaining sections (## headings) in order of relevance, dropping any section with nothing noteworthy left after the Top Stories pull.
+3. Keeps every story formatted as `**[Full headline](url)**` followed by a single bullet `- **Context**: one concise sentence on why it matters`. Preserve original URLs exactly.
+4. Removes duplicates, low-signal listicles, and pure opinion pieces.
+5. Uses clean, modern, scannable markdown — no extra commentary, no preamble, no sign-off. Output only the markdown briefing."""
 MAX_TOKENS   = 4096
 OPENROUTER_MAX_RETRIES = 4
 OPENROUTER_RETRY_DELAY = 5
@@ -551,7 +567,16 @@ def main():
     print(f"LLM calls done in {time.time()-t_llm:.1f}s")
     digest = "\n\n".join(digest_parts)
     print(f"Got {len(digest)} chars total")
-    print("--- LLM output (first 800 chars) ---")
+
+    print(f"Prioritising + reformatting via {MODEL_PRIORITISER}...")
+    t_pri = time.time()
+    try:
+        digest = call_llm(PRIORITISER_PROMPT, digest, model=MODEL_PRIORITISER)
+        print(f"Prioritiser done in {time.time()-t_pri:.1f}s ({len(digest)} chars)")
+    except Exception as e:
+        print(f"  WARN: prioritiser failed ({e}); falling back to raw digest")
+
+    print("--- Final digest (first 800 chars) ---")
     print(digest[:800])
     print("---")
 
