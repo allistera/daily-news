@@ -39,8 +39,8 @@ FEEDS = {
     ],
 }
 
-MODEL        = "google/gemini-2.5-flash"      # default (analysis-heavy sections)
-MODEL_FAST   = "google/gemini-2.0-flash-001"  # cheaper (list-heavy sections)
+MODEL        = "anthropic/claude-haiku-4-5"    # default (analysis-heavy sections)
+MODEL_FAST   = "anthropic/claude-haiku-4-5"   # cheaper (list-heavy sections)
 MODEL_PRIORITISER = "anthropic/claude-sonnet-4.6"  # final pass: prioritise + format
 # Sections that only need a bullet-list summary get the faster/cheaper model.
 FAST_SECTIONS = {"Product Hunt", "Reddit", "Smart Home"}
