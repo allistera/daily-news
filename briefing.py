@@ -1,4 +1,4 @@
-"""Daily news briefing: fetch RSS + HN → OpenRouter → Resend."""
+"""Daily news briefing: fetch RSS + HN → Anthropic Claude → Resend."""
 
 import html
 import json
@@ -39,9 +39,9 @@ FEEDS = {
     ],
 }
 
-MODEL        = "anthropic/claude-haiku-4-5"    # default (analysis-heavy sections)
-MODEL_FAST   = "anthropic/claude-haiku-4-5"   # cheaper (list-heavy sections)
-MODEL_PRIORITISER = "anthropic/claude-sonnet-4.6"  # final pass: prioritise + format
+MODEL        = "claude-haiku-4-5-20251001"    # default (analysis-heavy sections)
+MODEL_FAST   = "claude-haiku-4-5-20251001"   # cheaper (list-heavy sections)
+MODEL_PRIORITISER = "claude-sonnet-4-6"       # final pass: prioritise + format
 # Sections that only need a bullet-list summary get the faster/cheaper model.
 FAST_SECTIONS = {"Product Hunt", "Reddit", "Smart Home"}
 
@@ -60,9 +60,9 @@ You will receive the full draft briefing as markdown, organised by section. Rewr
 4. Removes duplicates, low-signal listicles, and pure opinion pieces.
 5. Uses clean, modern, scannable markdown — no extra commentary, no preamble, no sign-off. Output only the markdown briefing."""
 MAX_TOKENS   = 4096
-OPENROUTER_MAX_RETRIES = 4
-OPENROUTER_RETRY_DELAY = 5
-OPENROUTER_RETRYABLE_CODES = {429, 500, 502, 503, 504}
+API_MAX_RETRIES = 4
+API_RETRY_DELAY = 5
+API_RETRYABLE_CODES = {429, 500, 502, 503, 504}
 MAX_LLM_WORKERS = 2
 CUTOFF_HOURS = 24
 MAX_PER_FEED  = 10   # max articles returned per individual feed URL
@@ -295,7 +295,7 @@ def fetch_reddit(cutoff):
 
 
 # ---------------------------------------------------------------------------
-# OpenRouter
+# Anthropic API
 # ---------------------------------------------------------------------------
 
 def _retry_delay_from_error(error, attempt):
@@ -305,54 +305,55 @@ def _retry_delay_from_error(error, attempt):
         retry_after = headers.get("Retry-After")
     if retry_after:
         try:
-            return max(float(retry_after), OPENROUTER_RETRY_DELAY * attempt)
+            return max(float(retry_after), API_RETRY_DELAY * attempt)
         except ValueError:
             pass
-    return OPENROUTER_RETRY_DELAY * attempt
+    return API_RETRY_DELAY * attempt
 
 
 def call_llm(system, user, model=None):
     payload = json.dumps({
         "model":      model or MODEL,
         "max_tokens": MAX_TOKENS,
+        "system":     system,
         "messages":   [
-            {"role": "system", "content": system},
-            {"role": "user",   "content": user},
+            {"role": "user", "content": user},
         ],
     }).encode()
 
-    for attempt in range(1, OPENROUTER_MAX_RETRIES + 2):
+    for attempt in range(1, API_MAX_RETRIES + 2):
         req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/chat/completions",
+            "https://api.anthropic.com/v1/messages",
             data=payload,
             headers={
-                "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
-                "Content-Type":  "application/json",
+                "x-api-key":         os.environ["ANTHROPIC_API_KEY"],
+                "anthropic-version": "2023-06-01",
+                "Content-Type":      "application/json",
             },
         )
         try:
             with urllib.request.urlopen(req, timeout=120) as r:
-                return json.loads(r.read())["choices"][0]["message"]["content"]
+                return json.loads(r.read())["content"][0]["text"]
         except urllib.error.HTTPError as error:
             body = error.read().decode(errors="replace")
-            is_retryable = error.code in OPENROUTER_RETRYABLE_CODES
-            if not is_retryable or attempt > OPENROUTER_MAX_RETRIES:
+            is_retryable = error.code in API_RETRYABLE_CODES
+            if not is_retryable or attempt > API_MAX_RETRIES:
                 raise RuntimeError(
-                    f"OpenRouter {error.code}: {body[:500] or error.reason}"
+                    f"Anthropic API {error.code}: {body[:500] or error.reason}"
                 ) from error
             delay = _retry_delay_from_error(error, attempt)
             print(
-                f"  OpenRouter {error.code} ({error.reason}); "
-                f"retrying in {delay:.1f}s [{attempt}/{OPENROUTER_MAX_RETRIES}]"
+                f"  Anthropic API {error.code} ({error.reason}); "
+                f"retrying in {delay:.1f}s [{attempt}/{API_MAX_RETRIES}]"
             )
             time.sleep(delay)
         except urllib.error.URLError as error:
-            if attempt > OPENROUTER_MAX_RETRIES:
-                raise RuntimeError(f"OpenRouter request failed: {error.reason}") from error
-            delay = OPENROUTER_RETRY_DELAY * attempt
+            if attempt > API_MAX_RETRIES:
+                raise RuntimeError(f"Anthropic API request failed: {error.reason}") from error
+            delay = API_RETRY_DELAY * attempt
             print(
-                f"  OpenRouter network error ({error.reason}); "
-                f"retrying in {delay:.1f}s [{attempt}/{OPENROUTER_MAX_RETRIES}]"
+                f"  Anthropic API network error ({error.reason}); "
+                f"retrying in {delay:.1f}s [{attempt}/{API_MAX_RETRIES}]"
             )
             time.sleep(delay)
 
@@ -558,7 +559,7 @@ def main():
         return result
 
     worker_count = min(len(sections), MAX_LLM_WORKERS) or 1
-    print(f"Calling OpenRouter ({worker_count} workers max)...")
+    print(f"Calling Anthropic API ({worker_count} workers max)...")
     t_llm = time.time()
 
     with ThreadPoolExecutor(max_workers=worker_count) as ex:

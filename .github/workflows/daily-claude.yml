@@ -1,8 +1,8 @@
 name: Daily News Briefing
 
 on:
- # schedule:
- #   - cron: "30 9 * * *"   # 10:30 BST / 09:30 GMT
+  schedule:
+    - cron: "30 9 * * *"   # 10:30 BST / 09:30 GMT
   workflow_dispatch:
 
 jobs:
@@ -16,7 +16,7 @@ jobs:
 
       - name: Send daily briefing
         env:
-          OPENROUTER_API_KEY:  ${{ secrets.OPENROUTER_API_KEY }}
+          ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
           RESEND_API_KEY:     ${{ secrets.RESEND_API_KEY }}
           RUN_URL:            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         run: python3 briefing.py
