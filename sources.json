@@ -1,0 +1,34 @@
+[
+  {
+    "id": "hn-rss",
+    "name": "Hacker News RSS",
+    "type": "rss",
+    "url": "https://news.ycombinator.com/rss",
+    "enabled": true
+  },
+  {
+    "id": "tc-ai",
+    "name": "TechCrunch AI",
+    "type": "rss",
+    "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+    "enabled": true
+  },
+  {
+    "id": "tc-web",
+    "name": "TechCrunch Frontpage",
+    "type": "web",
+    "url": "https://techcrunch.com/",
+    "selector": "article.post-block",
+    "titleSelector": "h2.post-block__title a",
+    "linkSelector": "h2.post-block__title a",
+    "snippetSelector": "div.post-block__content",
+    "enabled": true
+  },
+  {
+    "id": "spacenews-web",
+    "name": "SpaceNews Highlights",
+    "type": "web",
+    "url": "https://spacenews.com/segment/news/",
+    "enabled": true
+  }
+]
