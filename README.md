@@ -1,4 +1,4 @@
-# Claude News SDK 📰🤖
+# Daily News Email Using Claude Agents 📰🤖
 
 A TypeScript SDK powered by Anthropic's Claude that leverages a multi-agent system to fetch, personalize, compile, and email a beautiful daily news digest.
 
