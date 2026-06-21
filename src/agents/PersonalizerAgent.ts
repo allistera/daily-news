@@ -6,10 +6,27 @@ export class PersonalizerAgent {
   private userProfile: UserProfile;
   private model: string;
 
-  constructor(apiKey: string, userProfile: UserProfile, model = 'claude-3-5-sonnet-latest') {
+  constructor(apiKey: string, userProfile: UserProfile, model = 'claude-opus-4-8') {
     this.anthropic = new Anthropic({ apiKey });
     this.userProfile = userProfile;
-    this.model = model && model.trim() ? model : 'claude-3-5-sonnet-latest';
+    this.model = this.sanitizeModel(model);
+  }
+
+  private sanitizeModel(model: string | undefined): string {
+    if (!model || !model.trim()) {
+      return 'claude-opus-4-8';
+    }
+    const val = model.trim().toLowerCase();
+    if (val.includes('3-5-sonnet') || val.includes('3.5-sonnet') || val === 'claude-3-5-sonnet-latest') {
+      return 'claude-sonnet-4-6';
+    }
+    if (val.includes('3-5-haiku') || val.includes('3.5-haiku') || val === 'claude-3-5-haiku-latest') {
+      return 'claude-haiku-4-5';
+    }
+    if (val.includes('3-opus') || val.includes('3.5-opus') || val.includes('claude-3-opus')) {
+      return 'claude-opus-4-8';
+    }
+    return model.trim();
   }
 
   /**
