@@ -25,10 +25,24 @@
     "enabled": true
   },
   {
-    "id": "spacenews-web",
-    "name": "SpaceNews Highlights",
-    "type": "web",
-    "url": "https://spacenews.com/segment/news/",
+    "id": "isp-reviwe",
+    "name": "ISP review",
+    "type": "rss",
+    "url": "https://www.ispreview.co.uk/index.php/feed",
+    "enabled": true
+  },
+  {
+    "id": "bbc-news",
+    "name": "BBC News",
+    "type": "rss",
+    "url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "enabled": true
+  },
+  {
+    "id": "the-verge",
+    "name": "The Verge",
+    "type": "rss",
+    "url": "https://www.theverge.com/rss/index.xml",
     "enabled": true
   }
 ]
