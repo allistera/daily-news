@@ -9,7 +9,7 @@ export class PersonalizerAgent {
   constructor(apiKey: string, userProfile: UserProfile, model = 'claude-3-5-sonnet-latest') {
     this.anthropic = new Anthropic({ apiKey });
     this.userProfile = userProfile;
-    this.model = model;
+    this.model = model && model.trim() ? model : 'claude-3-5-sonnet-latest';
   }
 
   /**

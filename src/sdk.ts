@@ -114,7 +114,7 @@ export class ClaudeNewsSDK {
     const personalizer = new PersonalizerAgent(
       this.config.anthropicApiKey,
       this.config.userProfile,
-      this.config.model
+      this.config.model && this.config.model.trim() ? this.config.model : undefined
     );
     const newsletter = await personalizer.run(uniqueArticles);
 
