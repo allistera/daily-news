@@ -14,7 +14,7 @@ from pathlib import Path
 import resend
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from sources.product_hunt import posts_for_email
+from sources.product_hunt import posts_for_email, previous_day
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 TEMPLATE_NAME = "template.html.jinja"
@@ -39,17 +39,10 @@ def render_html(sections: dict) -> str:
 def main() -> None:
     resend.api_key = os.environ["RESEND_API_KEY"]
 
-    subject = "Daily News Briefing — June 25, 2026"
+    subject = f"Daily News Briefing — {previous_day():%B %-d, %Y}"
 
     # Sample data — replace with your real newsletter content.
-    data = {
-        "Hacker News": [
-            {
-                "title": "The Verge",
-                "url": "https://www.theverge.com/2026/6/25/23775000/apple-iphone-15-pro-max-review",
-            }
-        ]
-    }
+    data = {}
 
     # Pull the previous day's top Product Hunt posts. Don't let one source
     # failing (e.g. a missing token) block the whole newsletter.

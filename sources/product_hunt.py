@@ -41,6 +41,11 @@ def _previous_day_window():
     return posted_after, posted_before, yesterday
 
 
+def previous_day():
+    """Return yesterday's date in UK time — the window ``posts_for_email`` covers."""
+    return _previous_day_window()[2]
+
+
 async def _fetch(count: int = 20):
     posted_after, posted_before, _ = _previous_day_window()
     async with _build_client() as client:
