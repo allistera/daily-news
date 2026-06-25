@@ -14,7 +14,7 @@ from pathlib import Path
 import resend
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-TEMPLATE_DIR = Path(__file__).parent
+TEMPLATE_DIR = Path(__file__).parent / "templates"
 TEMPLATE_NAME = "template.html.jinja"
 
 
