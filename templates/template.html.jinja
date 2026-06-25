@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ newsletter.title }}</title>
+  <title>Daily News</title>
 </head>
 <body style="background-color:#f6f6ef; margin:0; padding:0; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
   <center>
@@ -12,57 +12,39 @@
       <!-- HEADER BAR (HN orange) -->
       <tr>
         <td style="background-color:#ff6600; padding:2px 6px;">
-          <table width="100%" cellpadding="0" cellspacing="0" border="0">
-            <tr>
-              <td style="vertical-align:middle;">
-                <span style="border:1px solid #ffffff; padding:0 3px; font-weight:bold; color:#000000; font-size:13px; font-family:Verdana,Geneva,sans-serif;">DN</span>
-                <span style="color:#000000; font-weight:bold; font-size:13px; font-family:Verdana,Geneva,sans-serif; margin-left:4px;">{{ newsletter.title }}</span>
-              </td>
-              <td align="right" style="vertical-align:middle;">
-                <span style="color:#000000; font-size:11px; font-family:Verdana,Geneva,sans-serif;">{{ profile.name }} &middot; {{ newsletter.date }}</span>
-              </td>
-            </tr>
-          </table>
+          <span style="border:1px solid #ffffff; padding:0 3px; font-weight:bold; color:#000000; font-size:13px; font-family:Verdana,Geneva,sans-serif;">DN</span>
+          <span style="color:#000000; font-weight:bold; font-size:13px; font-family:Verdana,Geneva,sans-serif; margin-left:4px;">Daily News</span>
         </td>
       </tr>
 
       <!-- SPACER -->
       <tr><td style="height:10px; line-height:10px; font-size:10px;">&nbsp;</td></tr>
 
-      <!-- STORIES -->
+      <!-- SECTIONS -->
       <tr>
         <td style="padding:0 8px;">
-          <table width="100%" cellpadding="0" cellspacing="0" border="0">
-            {% for article in articles %}
-              {% if article.relevanceScore >= 7.5 %}{% set scoreColor = '#1a8917' %}
-              {% elif article.relevanceScore >= 5 %}{% set scoreColor = '#a86400' %}
-              {% else %}{% set scoreColor = '#a30000' %}{% endif %}
-            <!-- title line -->
+          {% for section, items in sections.items() %}
+          <!-- section heading -->
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:5px;">
             <tr>
-              <td align="right" valign="top" width="22" style="color:#828282; font-size:13px; font-family:Verdana,Geneva,sans-serif; padding-right:3px; line-height:1.35;">{{ loop.index }}.</td>
-              <td valign="top" width="12" style="color:#999999; font-size:10px; font-family:Verdana,Geneva,sans-serif; padding-top:3px; line-height:1.35;">&#9650;</td>
-              <td valign="top" style="line-height:1.35;">
-                <a href="{{ article.link }}" target="_blank" style="color:#000000; font-size:13px; text-decoration:none; font-family:Verdana,Geneva,sans-serif;">{{ article.title }}</a>
-                <span style="color:#828282; font-size:11px; font-family:Verdana,Geneva,sans-serif;">({{ article.sourceName }})</span>
+              <td style="border-bottom:1px solid #ff6600; padding-bottom:2px;">
+                <span style="color:#000000; font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:0.04em; font-family:Verdana,Geneva,sans-serif;">{{ section }}</span>
               </td>
             </tr>
-            <!-- subtext: relevance + summary -->
+          </table>
+          <!-- section items -->
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
+            {% for item in items %}
             <tr>
-              <td colspan="2"></td>
-              <td style="line-height:1.4; padding-top:1px;">
-                <span style="color:{{ scoreColor }}; font-size:10px; font-weight:bold; font-family:Verdana,Geneva,sans-serif;">{{ "%.1f"|format(article.relevanceScore) }}/10 match</span>
-                <span style="color:#828282; font-size:10px; font-family:Verdana,Geneva,sans-serif;"> &middot; {{ article.summary }}</span>
-              </td>
-            </tr>
-            <!-- subtext: why this matters -->
-            <tr>
-              <td colspan="2"></td>
-              <td style="line-height:1.4; padding-top:1px; padding-bottom:12px;">
-                <span style="color:#828282; font-size:10px; font-family:Verdana,Geneva,sans-serif;"><i>why this matters: {{ article.relevanceExplanation }}</i></span>
+              <td align="right" valign="top" width="22" style="color:#828282; font-size:13px; font-family:Verdana,Geneva,sans-serif; padding-right:3px; line-height:1.5;">{{ loop.index }}.</td>
+              <td valign="top" width="12" style="color:#999999; font-size:10px; font-family:Verdana,Geneva,sans-serif; padding-top:3px; line-height:1.5;">&#9650;</td>
+              <td valign="top" style="line-height:1.5; padding-bottom:2px;">
+                <a href="{{ item.url }}" target="_blank" style="color:#000000; font-size:13px; text-decoration:none; font-family:Verdana,Geneva,sans-serif;">{{ item.title }}</a>
               </td>
             </tr>
             {% endfor %}
           </table>
+          {% endfor %}
         </td>
       </tr>
 
