@@ -1,7 +1,8 @@
 import asyncio
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 env = os.environ
 from fastmcp import Client
@@ -15,11 +16,15 @@ client = Client({
     }
 })
 
-# Build the previous day's UTC window: [yesterday 00:00, today 00:00).
-today = datetime.now(timezone.utc).date()
+# Build the previous day's window in UK time (Europe/London handles BST/GMT),
+# converted to UTC for the API.
+UK = ZoneInfo("Europe/London")
+today = datetime.now(UK).date()
 yesterday = today - timedelta(days=1)
-posted_after = f"{yesterday}T00:00:00Z"
-posted_before = f"{today}T00:00:00Z"
+day_start = datetime.combine(yesterday, time.min, tzinfo=UK)
+day_end = datetime.combine(today, time.min, tzinfo=UK)
+posted_after = day_start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+posted_before = day_end.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 async def main():
@@ -39,6 +44,6 @@ async def main():
         return [getattr(block, "text", str(block)) for block in result.content]
 
 
-print(f"Top Product Hunt posts for {yesterday} (by votes):\n")
+print(f"Top Product Hunt posts for {yesterday} (UK time, by votes):\n")
 results = asyncio.run(main())
 print(json.dumps(results, indent=2, default=str))
