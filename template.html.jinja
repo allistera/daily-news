@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ newsletter.title }}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+    body {
+      background-color: #0a0f1d;
+      margin: 0;
+      padding: 0;
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+    @media only screen and (max-width: 600px) {
+      .container {
+        width: 100% !important;
+        padding: 10px !important;
+      }
+      .header-title {
+        font-size: 28px !important;
+      }
+    }
+  </style>
+</head>
+<body style="background-color: #0a0f1d; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e2e8f0; margin: 0; padding: 20px 0;">
+  <center>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0a0f1d; max-width: 650px; margin: 0 auto; text-align: left;" class="container">
+      <!-- HEADER -->
+      <tr>
+        <td style="padding: 30px 20px 20px 20px; border-bottom: 1px solid #1e293b; background: linear-gradient(135deg, #0f172a 0%, #0a0f1d 100%); border-radius: 16px 16px 0 0;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td>
+                <span style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; font-family: sans-serif; display: block; margin-bottom: 6px;">
+                  CLAUDE POWERED INTELLIGENCE BRIEFING
+                </span>
+                <h1 class="header-title" style="margin: 0 0 10px 0; font-size: 32px; font-weight: 800; color: #ffffff; letter-spacing: -0.02em; font-family: 'Outfit', sans-serif;">
+                  {{ newsletter.title }}
+                </h1>
+                <p style="margin: 0; font-size: 14px; color: #94a3b8; font-family: sans-serif;">
+                  Prepared for <strong style="color: #f1f5f9;">{{ profile.name }}</strong> on <strong>{{ newsletter.date }}</strong>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+
+      <!-- NEWS ARTICLES SECTIONS -->
+      <tr>
+        <td style="padding: 30px 20px; background-color: #0a0f1d; border-left: 1px solid #1e293b; border-right: 1px solid #1e293b;">
+          {% for article in articles %}
+            {% if article.relevanceScore >= 7.5 %}
+              {% set scoreBg = '#064e3b' %}{% set scoreText = '#34d399' %}
+            {% elif article.relevanceScore >= 5 %}
+              {% set scoreBg = '#422006' %}{% set scoreText = '#fbbf24' %}
+            {% else %}
+              {% set scoreBg = '#450a0a' %}{% set scoreText = '#f87171' %}
+            {% endif %}
+            <div class="article-card" style="background-color: #161f38; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #233154; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 12px;">
+                      <tr>
+                        <td style="background-color: #233154; color: #cbd5e1; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; font-family: sans-serif; display: inline-block;">
+                          {{ article.sourceName }}
+                        </td>
+                        <td style="width: 8px;"></td>
+                        <td style="background-color: {{ scoreBg }}; color: {{ scoreText }}; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; font-family: sans-serif; display: inline-block;">
+                          {{ "%.1f"|format(article.relevanceScore) }}/10 Match
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px; font-weight: 700; line-height: 1.4; color: #ffffff; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      <a href="{{ article.link }}" target="_blank" style="color: #ffffff; text-decoration: none; border-bottom: 1px dashed #475569;">
+                        {{ article.title }}
+                      </a>
+                    </h3>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 14px 0; font-size: 14px; line-height: 1.6; color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      {{ article.summary }}
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: rgba(56, 189, 248, 0.04); border-left: 3px solid #38bdf8; padding: 8px 12px; margin-bottom: 15px; border-radius: 0 6px 6px 0;">
+                    <p style="margin: 0; font-size: 12.5px; font-style: italic; color: #38bdf8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      <strong style="font-weight: 600; font-style: normal; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; display: inline-block; margin-right: 4px;">Why this matters:</strong>
+                      {{ article.relevanceExplanation }}
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top: 10px;">
+                    <a href="{{ article.link }}" target="_blank" style="background-color: #38bdf8; color: #0a0f1d; font-size: 13px; font-weight: 600; text-decoration: none; padding: 8px 18px; border-radius: 6px; display: inline-block; font-family: sans-serif; transition: background-color 0.2s;">
+                      Read Article &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </div>
+          {% endfor %}
+        </td>
+      </tr>
+
+      <!-- FOOTER -->
+      <tr>
+        <td style="padding: 20px; text-align: center;">
+          <p style="margin: 0; font-size: 11px; color: #475569; font-family: sans-serif;">
+            Generated using Daily News
+          </p>
+        </td>
+      </tr>
+    </table>
+  </center>
+</body>
+</html>

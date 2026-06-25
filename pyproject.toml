@@ -3,5 +3,6 @@ name = "daily-news"
 version = "0.1.0"
 requires-python = ">=3.9"
 dependencies = [
+    "jinja2>=3.1.6",
     "resend>=2.32.2",
 ]
