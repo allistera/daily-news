@@ -1,0 +1,36 @@
+name: Daily Product Hunt Email
+
+on:
+  schedule:
+    # 05:00 UTC = 06:00 UK during BST (summer) and 05:00 UK during GMT (winter).
+    # Cron has no timezone, so it can't follow the BST/GMT switch automatically.
+    # (Switch to '0 6 * * *' if you'd rather it be 06:00 in winter.)
+    # Note: GitHub may delay scheduled runs by several minutes.
+    - cron: '0 5 * * *'
+  workflow_dispatch: {}        # Allow manual runs from the Actions tab
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # send_email.py spawns the `product-hunt-mcp` command via fastmcp, so the
+      # MCP server must be on PATH. It lives in its own isolated tool venv to
+      # avoid clashing with this project's fastmcp pin.
+      - name: Install Product Hunt MCP server
+        run: |
+          uv tool install product-hunt-mcp
+          echo "$(uv tool dir --bin)" >> "$GITHUB_PATH"
+
+      - name: Send daily Product Hunt email
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          PRODUCT_HUNT_TOKEN: ${{ secrets.PRODUCT_HUNT_TOKEN }}
+        run: uv run send_email.py
