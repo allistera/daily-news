@@ -39,9 +39,10 @@ def render_html(sections: dict) -> str:
 def main() -> None:
     resend.api_key = os.environ["RESEND_API_KEY"]
 
-    subject = f"Daily News Briefing — {previous_day():%B %-d, %Y}"
+    day = previous_day()
+    subject = f"Daily News Briefing — {day:%B} {day.day}, {day.year}"
 
-    # Sample data — replace with your real newsletter content.
+    # Each source contributes a section of [{"title", "url"}, ...] items.
     data = {}
 
     # Pull the previous day's top Product Hunt posts. Don't let one source
@@ -50,6 +51,12 @@ def main() -> None:
         data["Product Hunt"] = posts_for_email()
     except Exception as exc:  # noqa: BLE001
         print(f"Skipping Product Hunt section: {exc}")
+
+    # Drop empty sections and bail out rather than mailing a contentless email.
+    data = {name: items for name, items in data.items() if items}
+    if not data:
+        print("No content to send — skipping email.")
+        return
 
     params: resend.Emails.SendParams = {
         "from": "hey@infinitywave.online",
