@@ -33,4 +33,6 @@ jobs:
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           PRODUCT_HUNT_TOKEN: ${{ secrets.PRODUCT_HUNT_TOKEN }}
+          # Auto-provided by Actions; raises the GitHub search rate limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run send_email.py
