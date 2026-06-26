@@ -67,7 +67,7 @@ def main() -> None:
 
     params: resend.Emails.SendParams = {
         "from": "hey@infinitywave.online",
-        "to": ["allistera@gmail.com"],
+        "to": ["allisteraall@gmail.com"],
         "subject": subject,
         "html": render_html(data),
     }
