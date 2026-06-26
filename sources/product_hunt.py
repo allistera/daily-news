@@ -74,14 +74,20 @@ def fetch_top_posts(count: int = 20):
 
 
 def _extract_posts(data):
-    """Pull the list of post objects out of a ``get_posts`` response."""
+    """Return the list of post objects from a ``get_posts`` response.
+
+    The MCP server hands back GraphQL connection edges — i.e.
+    ``data["data"]["posts"] == [{"node": {...post...}}, ...]`` — so each
+    edge's ``node`` is unwrapped to the actual post.
+    """
     if isinstance(data, dict):
         inner = data.get("data", data)
-        if isinstance(inner, dict):
-            return inner.get("posts") or []
-    if isinstance(data, list):
-        return data
-    return []
+        if isinstance(inner, dict) and "posts" in inner:
+            data = inner["posts"] or []
+    if not isinstance(data, list):
+        return []
+    return [item.get("node", item) if isinstance(item, dict) else item
+            for item in data]
 
 
 def posts_for_email(count: int = 20) -> list[dict]:
