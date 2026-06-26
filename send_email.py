@@ -27,6 +27,9 @@ SOURCES = [
     ("Product Hunt Launches", posts_for_email),
 ]
 
+# How many items to show per section.
+ITEMS_PER_SECTION = 7
+
 
 def render_html(sections: dict) -> str:
     """Render the email template to an HTML string.
@@ -60,7 +63,7 @@ def main() -> None:
     data = {}
     for heading, fetch in SOURCES:
         try:
-            data[heading] = fetch(day=day)
+            data[heading] = fetch(count=ITEMS_PER_SECTION, day=day)
         except Exception as exc:  # noqa: BLE001
             print(f"Skipping {heading} section: {exc}")
 
