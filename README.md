@@ -1,5 +1,8 @@
 # Daily News
 
+> A daily email digest of yesterday's top GitHub repos and Product Hunt
+> launches — sent via Resend on a GitHub Actions schedule.
+
 A small Python service that assembles a daily email newsletter from a set of
 **sources** and delivers it with [Resend](https://resend.com). It runs every
 morning via GitHub Actions (and can be triggered manually).
