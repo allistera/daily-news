@@ -3,68 +3,112 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily News</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Daily Tech Roundup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
-<body style="background-color:#f6f6ef; margin:0; padding:0; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
-  <center>
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f6f6ef; max-width:650px; margin:0 auto; text-align:left; font-family:Verdana,Geneva,sans-serif;">
-
-      <!-- HEADER BAR (HN orange) -->
+{# Accent palettes, converted from the design's oklch() values to email-safe hex. #}
+{% set sans = "'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" %}
+{% set mono = "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace" %}
+{% set accents = {
+  "purple": {"chip_bg": "#e4e4ff", "chip_text": "#514d85", "rank": "#aaaad0", "name": "#3b3b4d", "cat_bg": "#f0eefb", "cat_text": "#514d85"},
+  "orange": {"chip_bg": "#ffdfcb", "chip_text": "#8a4b24", "rank": "#ddab90", "name": "#473a30", "cat_bg": "#fcebde", "cat_text": "#855f49"}
+} %}
+<body style="background-color:#f8f6ec; margin:0; padding:0; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+  <center style="width:100%; background-color:#f8f6ec;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8f6ec;">
       <tr>
-        <td style="background-color:#ff6600; padding:2px 6px;">
-          <span style="border:1px solid #ffffff; padding:0 3px; font-weight:bold; color:#000000; font-size:13px; font-family:Verdana,Geneva,sans-serif;">DN</span>
-          <span style="color:#000000; font-weight:bold; font-size:13px; font-family:Verdana,Geneva,sans-serif; margin-left:4px;">Daily News</span>
-        </td>
-      </tr>
+        <td align="center" style="padding:40px 16px;">
 
-      <!-- TAGLINE -->
-      <tr>
-        <td style="padding:6px 8px 0;">
-          <span style="color:#828282; font-size:11px; font-family:Verdana,Geneva,sans-serif;">Yesterday's top GitHub repos and Product Hunt launches.</span>
-        </td>
-      </tr>
+          <!-- CARD -->
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:600px; background-color:#fefdfa; border:1px solid #eae8df; border-radius:18px; overflow:hidden; text-align:left;">
 
-      <!-- SPACER -->
-      <tr><td style="height:10px; line-height:10px; font-size:10px;">&nbsp;</td></tr>
-
-      <!-- SECTIONS -->
-      <tr>
-        <td style="padding:0 8px;">
-          {% for section, items in sections.items() %}
-          <!-- section heading -->
-          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:5px;">
+            <!-- MASTHEAD -->
             <tr>
-              <td style="border-bottom:1px solid #ff6600; padding-bottom:2px;">
-                <span style="color:#000000; font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:0.04em; font-family:Verdana,Geneva,sans-serif;">{{ section }}</span>
-              </td>
-            </tr>
-          </table>
-          <!-- section items -->
-          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
-            {% for item in items %}
-            <tr>
-              <td align="right" valign="top" width="22" style="color:#828282; font-size:13px; font-family:Verdana,Geneva,sans-serif; padding-right:3px; line-height:1.5;">{{ loop.index }}.</td>
-              <td valign="top" width="12" style="color:#999999; font-size:10px; font-family:Verdana,Geneva,sans-serif; padding-top:3px; line-height:1.5;">&#9650;</td>
-              <td valign="top" style="line-height:1.5; padding-bottom:8px;">
-                <a href="{{ item.url }}" target="_blank" style="color:#000000; font-size:13px; text-decoration:none; font-family:Verdana,Geneva,sans-serif;">{{ item.title }}</a>
-                {% if item.description %}
-                <div style="color:#828282; font-size:11px; font-family:Verdana,Geneva,sans-serif; line-height:1.4; margin-top:1px;">{{ item.description }}</div>
+              <td style="padding:34px 38px 28px; border-bottom:1px solid #edebe4;">
+                <div style="font-family:{{ mono }}; font-size:11px; letter-spacing:2.5px; text-transform:uppercase; color:#997866; font-weight:500;">Daily Tech Roundup</div>
+                <h1 style="margin:14px 0 0; font-family:{{ sans }}; font-size:27px; line-height:1.18; font-weight:700; letter-spacing:-0.5px; color:#373327;">What shipped while you slept</h1>
+                {% if quote %}
+                <div style="margin:14px 0 0; padding-left:14px; border-left:2px solid #c9c9f4;">
+                  <p style="margin:0; font-family:{{ sans }}; font-size:15px; line-height:1.55; color:#575246; font-style:italic;">&ldquo;{{ quote }}&rdquo;</p>
+                  {% if quote_author %}
+                  <div style="margin-top:8px; font-family:{{ mono }}; font-size:11.5px; color:#87806c;">&mdash; {{ quote_author }}</div>
+                  {% endif %}
+                </div>
+                {% endif %}
+                {% if date_line %}
+                <div style="margin-top:18px; font-family:{{ mono }}; font-size:11.5px; color:#7f7a6d;">
+                  <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#8ec899; vertical-align:middle; margin-right:8px;"></span><span style="vertical-align:middle;">{{ date_line }}</span>
+                </div>
                 {% endif %}
               </td>
             </tr>
+
+            <!-- SECTIONS -->
+            {% for section in sections %}
+            {% set ac = accents.get(section.accent, accents["purple"]) %}
+            <tr>
+              <td style="padding:{{ '32px 38px 8px' if loop.first else '28px 38px 8px' }};">
+
+                <!-- section heading -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:2px;">
+                  <tr>
+                    <td valign="middle" style="white-space:nowrap;">
+                      <span style="display:inline-block; font-family:{{ mono }}; font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase; padding:5px 11px; border-radius:999px; background:{{ ac.chip_bg }}; color:{{ ac.chip_text }};">{{ section.name }}</span>
+                    </td>
+                    <td valign="middle" width="100%" style="padding:0 10px;">
+                      <div style="height:1px; background:#eae8df; font-size:0; line-height:0;">&nbsp;</div>
+                    </td>
+                    {% if section.subtitle %}
+                    <td valign="middle" style="white-space:nowrap; font-family:{{ mono }}; font-size:11px; color:#8b8679;">{{ section.subtitle }}</td>
+                    {% endif %}
+                  </tr>
+                </table>
+
+                <!-- section items -->
+                {% for item in section["items"] %}
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                  <tr>
+                    <td style="border-bottom:1px solid #f0eee9; padding:18px 0;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td valign="top" width="26" style="font-family:{{ mono }}; font-size:15px; font-weight:600; color:{{ ac.rank }}; padding-top:1px;">{{ "%02d"|format(loop.index) }}</td>
+                          <td valign="top" style="padding-left:16px;">
+                            <a href="{{ item.url }}" target="_blank" style="font-family:{{ mono if section.accent != 'orange' else sans }}; font-size:{{ '14.5px' if section.accent != 'orange' else '15.5px' }}; font-weight:{{ '600' if section.accent != 'orange' else '700' }}; color:{{ ac.name }}; text-decoration:none; word-break:break-word; letter-spacing:{{ '0' if section.accent != 'orange' else '-0.2px' }};">{{ item.title }}</a>{% if item.tagline %} <span style="font-family:{{ sans }}; font-size:13px; color:#858073;">{{ item.tagline }}</span>{% endif %}
+                            {% if item.description %}
+                            <p style="margin:5px 0 0; font-family:{{ sans }}; font-size:13.5px; line-height:1.55; color:#66635a;">{{ item.description }}</p>
+                            {% endif %}
+                            {% if item.meta %}
+                            <div style="margin-top:10px; font-family:{{ mono }}; font-size:11.5px; color:#767165; line-height:1.9;">
+                              {% for m in item.meta %}{% if m.chip %}<span style="display:inline-block; padding:3px 9px; border-radius:999px; background:{{ ac.cat_bg }}; color:{{ ac.cat_text }}; margin-right:14px;">{{ m.text }}</span>{% elif m.dot %}<span style="display:inline-block; margin-right:16px; white-space:nowrap;"><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:{{ m.dot }}; vertical-align:middle; margin-right:6px;"></span><span style="vertical-align:middle;">{{ m.text }}</span></span>{% else %}<span style="display:inline-block; margin-right:16px; white-space:nowrap;{% if m.color %} color:{{ m.color }};{% endif %}">{{ m.text }}</span>{% endif %}{% endfor %}
+                            </div>
+                            {% endif %}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+                {% endfor %}
+
+              </td>
+            </tr>
             {% endfor %}
+
+            <!-- FOOTER -->
+            <tr>
+              <td style="padding:26px 38px 32px; background-color:#f6f4eb; border-top:1px solid #edebe4; text-align:center;">
+                <div style="font-family:{{ mono }}; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#9b8071; font-weight:500;">Daily Tech Roundup</div>
+                <p style="margin:10px auto 0; font-family:{{ sans }}; font-size:12px; line-height:1.6; color:#848076; max-width:38ch;">You&rsquo;re getting this because you signed up for a daily dose of what&rsquo;s trending in tech.</p>
+              </td>
+            </tr>
+
           </table>
-          {% endfor %}
+
         </td>
       </tr>
-
-      <!-- FOOTER -->
-      <tr>
-        <td style="border-top:2px solid #ff6600; padding:8px 6px; text-align:center;">
-          <span style="color:#828282; font-size:10px; font-family:Verdana,Geneva,sans-serif;">Generated using Daily News</span>
-        </td>
-      </tr>
-
     </table>
   </center>
 </body>
