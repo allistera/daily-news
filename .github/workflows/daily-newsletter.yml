@@ -1,4 +1,4 @@
-name: Daily Product Hunt Email
+name: Daily Newsletter
 
 on:
   schedule:
@@ -21,15 +21,15 @@ jobs:
         with:
           enable-cache: true
 
-      # send_email.py spawns the `product-hunt-mcp` command via fastmcp, so the
-      # MCP server must be on PATH. It lives in its own isolated tool venv to
+      # send_email.py spawns MCP servers (e.g. `product-hunt-mcp`) via fastmcp,
+      # so they must be on PATH. Each lives in its own isolated tool venv to
       # avoid clashing with this project's fastmcp pin.
-      - name: Install Product Hunt MCP server
+      - name: Install MCP servers
         run: |
           uv tool install product-hunt-mcp
           echo "$(uv tool dir --bin)" >> "$GITHUB_PATH"
 
-      - name: Send daily Product Hunt email
+      - name: Send daily newsletter
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           PRODUCT_HUNT_TOKEN: ${{ secrets.PRODUCT_HUNT_TOKEN }}

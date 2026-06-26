@@ -60,7 +60,7 @@ sources/*.py  ──>  send_email.py  ──>  Jinja2 template  ──>  Resend 
 ├── templates/
 │   └── template.html.jinja           # newsletter HTML
 ├── .github/workflows/
-│   └── product-hunt-daily.yml        # daily schedule + manual trigger
+│   └── daily-newsletter.yml          # daily schedule + manual trigger
 └── pyproject.toml                    # deps + ruff config (managed by uv)
 ```
 
@@ -106,7 +106,7 @@ PRODUCT_HUNT_TOKEN=ph_xxx uv run python sources/product_hunt.py
 
 ## Scheduled delivery (GitHub Actions)
 
-`.github/workflows/product-hunt-daily.yml` runs at **05:00 UTC** (≈06:00 UK in
+`.github/workflows/daily-newsletter.yml` runs at **05:00 UTC** (≈06:00 UK in
 summer) and can be triggered manually from the **Actions** tab. Add these
 **repository secrets** (Settings → Secrets and variables → Actions):
 
@@ -117,7 +117,7 @@ summer) and can be triggered manually from the **Actions** tab. Add these
 Trigger a manual run:
 
 ```bash
-gh workflow run "Daily Product Hunt Email"
+gh workflow run "Daily Newsletter"
 ```
 
 ---
