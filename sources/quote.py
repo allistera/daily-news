@@ -47,8 +47,8 @@ def _extract_quote(data):
 def quote_for_email(category: str | None = None) -> dict | None:
     """Return ``{"quote", "author"}`` for the masthead epigraph, or ``None``.
 
-    ``None`` means there was nothing usable to show (so the caller can fall back
-    to its own quote); network/auth errors propagate so the caller can log them.
+    ``None`` means there was nothing usable to show; network/auth errors
+    propagate so the caller can log them.
     """
     record = _extract_quote(fetch_quote(category))
     if not record:

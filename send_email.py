@@ -48,16 +48,22 @@ def masthead_quote() -> tuple[str, str]:
     """The masthead epigraph, fetched live from API Ninjas.
 
     Returns empty strings when ``API_NINJAS_KEY`` is unset or the request
-    fails; the template simply omits the epigraph in that case.
+    fails; the template simply omits the epigraph in that case. The three
+    no-quote paths log distinct messages so an intentional opt-out (no key)
+    reads differently from a genuine outage (request failed / empty response).
     """
+    if not os.environ.get("API_NINJAS_KEY"):
+        print("API_NINJAS_KEY not set; masthead quote disabled.")
+        return "", ""
     try:
         live = quote_for_email()
     except Exception as exc:  # noqa: BLE001
-        print(f"Skipping the masthead quote: {exc}")
-        live = None
-    if live:
-        return live["quote"], live["author"]
-    return "", ""
+        print(f"Masthead quote request failed; omitting epigraph: {exc}")
+        return "", ""
+    if not live:
+        print("Masthead quote response was empty; omitting epigraph.")
+        return "", ""
+    return live["quote"], live["author"]
 
 
 def render_html(sections: list, quote: str, quote_author: str, date_line: str) -> str:
