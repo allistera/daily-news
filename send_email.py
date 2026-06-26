@@ -15,9 +15,17 @@ import resend
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from sources.product_hunt import posts_for_email, previous_day
+from sources.top_github_repos import repos_for_email
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 TEMPLATE_NAME = "template.html.jinja"
+
+# Newsletter sections in display order: (heading, fetch function). Each fetch
+# returns a list of {"title", "url"} items for the previous day.
+SOURCES = [
+    ("Top GitHub Repos", repos_for_email),
+    ("Product Hunt Launches", posts_for_email),
+]
 
 
 def render_html(sections: dict) -> str:
@@ -42,15 +50,14 @@ def main() -> None:
     day = previous_day()
     subject = f"Daily News Briefing — {day:%B} {day.day}, {day.year}"
 
-    # Each source contributes a section of [{"title", "url"}, ...] items.
+    # Build each section. Don't let one source failing (e.g. a missing token)
+    # block the whole newsletter.
     data = {}
-
-    # Pull the previous day's top Product Hunt posts. Don't let one source
-    # failing (e.g. a missing token) block the whole newsletter.
-    try:
-        data["Product Hunt"] = posts_for_email()
-    except Exception as exc:  # noqa: BLE001
-        print(f"Skipping Product Hunt section: {exc}")
+    for heading, fetch in SOURCES:
+        try:
+            data[heading] = fetch()
+        except Exception as exc:  # noqa: BLE001
+            print(f"Skipping {heading} section: {exc}")
 
     # Drop empty sections and bail out rather than mailing a contentless email.
     data = {name: items for name, items in data.items() if items}
