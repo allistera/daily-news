@@ -43,50 +43,21 @@ SOURCES = [
 # How many items to show per section.
 ITEMS_PER_SECTION = 7
 
-# Rotated daily (deterministically, by date) as the masthead epigraph.
-QUOTES = [
-    ("Simplicity is a prerequisite for reliability.", "Edsger W. Dijkstra"),
-    (
-        "Programs must be written for people to read, and only incidentally "
-        "for machines to execute.",
-        "Harold Abelson",
-    ),
-    ("Premature optimization is the root of all evil.", "Donald Knuth"),
-    (
-        "Any fool can write code that a computer can understand. Good "
-        "programmers write code that humans can understand.",
-        "Martin Fowler",
-    ),
-    ("The best way to predict the future is to invent it.", "Alan Kay"),
-    ("Talk is cheap. Show me the code.", "Linus Torvalds"),
-    ("Make it work, make it right, make it fast.", "Kent Beck"),
-    ("First, solve the problem. Then, write the code.", "John Johnson"),
-    ("Controlling complexity is the essence of computer programming.", "Brian Kernighan"),
-    (
-        "There are only two hard things in Computer Science: cache "
-        "invalidation and naming things.",
-        "Phil Karlton",
-    ),
-]
 
+def masthead_quote() -> tuple[str, str]:
+    """The masthead epigraph, fetched live from API Ninjas.
 
-def _fallback_quote(day) -> tuple[str, str]:
-    """Pick a built-in epigraph deterministically so a given date is stable."""
-    quote, author = QUOTES[day.toordinal() % len(QUOTES)]
-    return quote, author
-
-
-def masthead_quote(day) -> tuple[str, str]:
-    """The masthead epigraph: a live quote from API Ninjas, falling back to the
-    built-in list when ``API_NINJAS_KEY`` is unset or the request fails."""
+    Returns empty strings when ``API_NINJAS_KEY`` is unset or the request
+    fails; the template simply omits the epigraph in that case.
+    """
     try:
         live = quote_for_email()
     except Exception as exc:  # noqa: BLE001
-        print(f"Falling back to a built-in quote: {exc}")
+        print(f"Skipping the masthead quote: {exc}")
         live = None
     if live:
         return live["quote"], live["author"]
-    return _fallback_quote(day)
+    return "", ""
 
 
 def render_html(sections: list, quote: str, quote_author: str, date_line: str) -> str:
@@ -120,7 +91,7 @@ def main() -> None:
     day = previous_day()
     subject = f"Daily News Briefing — {day:%B} {day.day}, {day.year}"
     date_line = f"{day:%A}, {day:%B} {day.day}, {day.year}"
-    quote, quote_author = masthead_quote(day)
+    quote, quote_author = masthead_quote()
 
     # Build each section. Don't let one source failing (e.g. a missing token)
     # block the whole newsletter.

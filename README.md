@@ -84,7 +84,7 @@ uv tool install product-hunt-mcp
 | --- | --- | --- |
 | `RESEND_API_KEY` | ✅ | sending the email |
 | `PRODUCT_HUNT_TOKEN` | ✅ (for the Product Hunt section) | `sources/product_hunt.py` |
-| `API_NINJAS_KEY` | optional | `sources/quote.py` (masthead quote; falls back to a built-in list without it) |
+| `API_NINJAS_KEY` | optional | `sources/quote.py` (masthead quote; the epigraph is omitted without it) |
 | `GITHUB_TOKEN` | optional | `sources/top_github_repos.py` (raises the search rate limit) |
 
 > Importing a source module never requires its token — clients/requests are
