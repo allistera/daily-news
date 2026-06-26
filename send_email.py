@@ -45,8 +45,13 @@ def render_html(sections: dict) -> str:
 
 
 def main() -> None:
-    resend.api_key = os.environ["RESEND_API_KEY"]
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        raise SystemExit("RESEND_API_KEY is not set; cannot send the newsletter.")
+    resend.api_key = api_key
 
+    # Pin the subject date and every source to a single instant so they can't
+    # disagree if the run happens to cross UK midnight.
     day = previous_day()
     subject = f"Daily News Briefing — {day:%B} {day.day}, {day.year}"
 
@@ -55,15 +60,15 @@ def main() -> None:
     data = {}
     for heading, fetch in SOURCES:
         try:
-            data[heading] = fetch()
+            data[heading] = fetch(day=day)
         except Exception as exc:  # noqa: BLE001
             print(f"Skipping {heading} section: {exc}")
 
-    # Drop empty sections and bail out rather than mailing a contentless email.
+    # Drop empty sections. If every source failed or was empty, fail loudly so
+    # the scheduled run is flagged rather than silently sending nothing.
     data = {name: items for name, items in data.items() if items}
     if not data:
-        print("No content to send — skipping email.")
-        return
+        raise SystemExit("No content from any source; not sending an empty newsletter.")
 
     params: resend.Emails.SendParams = {
         "from": "hey@infinitywave.online",
@@ -72,7 +77,10 @@ def main() -> None:
         "html": render_html(data),
     }
 
-    email = resend.Emails.send(params)
+    try:
+        email = resend.Emails.send(params)
+    except Exception as exc:
+        raise SystemExit(f"Failed to send newsletter via Resend: {exc}") from exc
     print(email)
 
 
