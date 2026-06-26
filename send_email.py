@@ -15,6 +15,7 @@ import resend
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from sources.product_hunt import posts_for_email, previous_day
+from sources.quote import quote_for_email
 from sources.top_github_repos import repos_for_email
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -69,10 +70,23 @@ QUOTES = [
 ]
 
 
-def quote_for(day) -> tuple[str, str]:
-    """Pick the day's epigraph deterministically so a given date is stable."""
+def _fallback_quote(day) -> tuple[str, str]:
+    """Pick a built-in epigraph deterministically so a given date is stable."""
     quote, author = QUOTES[day.toordinal() % len(QUOTES)]
     return quote, author
+
+
+def masthead_quote(day) -> tuple[str, str]:
+    """The masthead epigraph: a live quote from API Ninjas, falling back to the
+    built-in list when ``API_NINJAS_KEY`` is unset or the request fails."""
+    try:
+        live = quote_for_email()
+    except Exception as exc:  # noqa: BLE001
+        print(f"Falling back to a built-in quote: {exc}")
+        live = None
+    if live:
+        return live["quote"], live["author"]
+    return _fallback_quote(day)
 
 
 def render_html(sections: list, quote: str, quote_author: str, date_line: str) -> str:
@@ -106,7 +120,7 @@ def main() -> None:
     day = previous_day()
     subject = f"Daily News Briefing — {day:%B} {day.day}, {day.year}"
     date_line = f"{day:%A}, {day:%B} {day.day}, {day.year}"
-    quote, quote_author = quote_for(day)
+    quote, quote_author = masthead_quote(day)
 
     # Build each section. Don't let one source failing (e.g. a missing token)
     # block the whole newsletter.
