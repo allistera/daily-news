@@ -86,7 +86,7 @@ def _extract_posts(data):
 
 
 def posts_for_email(count: int = 20, day=None) -> list[dict]:
-    """Return the top posts as ``[{"title", "url"}, ...]`` for the email template."""
+    """Return the top posts as ``[{"title", "url", "description"}, ...]`` for the template."""
     items = []
     for post in _extract_posts(fetch_top_posts(count, day)):
         if not isinstance(post, dict):
@@ -94,7 +94,13 @@ def posts_for_email(count: int = 20, day=None) -> list[dict]:
         title = post.get("name") or post.get("tagline")
         url = post.get("url") or post.get("website")
         if title and url:
-            items.append({"title": title, "url": url})
+            items.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "description": post.get("tagline") or post.get("description") or "",
+                }
+            )
     return items
 
 

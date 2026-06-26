@@ -72,7 +72,7 @@ def _extract_repos(data):
 
 
 def repos_for_email(count: int = 20, day=None) -> list[dict]:
-    """Return the top repos as ``[{"title", "url"}, ...]`` for the email template."""
+    """Return the top repos as ``[{"title", "url", "description"}, ...]`` for the template."""
     items = []
     for repo in _extract_repos(fetch_top_repos(count, day)):
         if not isinstance(repo, dict):
@@ -80,7 +80,13 @@ def repos_for_email(count: int = 20, day=None) -> list[dict]:
         title = repo.get("full_name") or repo.get("name")
         url = repo.get("html_url") or repo.get("url")
         if title and url:
-            items.append({"title": title, "url": url})
+            items.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "description": repo.get("description") or "",
+                }
+            )
     return items
 
 

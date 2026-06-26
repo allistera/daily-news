@@ -35,9 +35,9 @@ def render_html(sections: dict) -> str:
     """Render the email template to an HTML string.
 
     ``sections`` maps a section name to a list of items, each with
-    ``title`` and ``url`` keys, e.g.::
+    ``title`` and ``url`` keys and an optional ``description``, e.g.::
 
-        {"Hacker News": [{"title": "...", "url": "https://..."}]}
+        {"Hacker News": [{"title": "...", "url": "https://...", "description": "..."}]}
     """
     env = Environment(
         loader=FileSystemLoader(TEMPLATE_DIR),
