@@ -71,8 +71,62 @@ def _extract_repos(data):
     return []
 
 
+# GitHub Linguist colours for the language dot. Falls back to a neutral grey.
+LANGUAGE_COLORS = {
+    "Python": "#3572a5",
+    "TypeScript": "#3178c6",
+    "JavaScript": "#f1e05a",
+    "Rust": "#dea584",
+    "Go": "#00add8",
+    "C++": "#f34b7d",
+    "C": "#555555",
+    "C#": "#178600",
+    "Java": "#b07219",
+    "Ruby": "#701516",
+    "Swift": "#f05138",
+    "Kotlin": "#a97bff",
+    "Shell": "#89e051",
+    "PHP": "#4f5d95",
+    "Dart": "#00b4ab",
+    "Zig": "#ec915c",
+    "Elixir": "#6e4a7e",
+    "Scala": "#c22d40",
+    "HTML": "#e34c26",
+    "CSS": "#563d7c",
+    "Vue": "#41b883",
+    "Lua": "#000080",
+    "Haskell": "#5e5086",
+}
+LANGUAGE_FALLBACK_COLOR = "#9b9b9b"
+
+
+def _format_stars(count) -> str | None:
+    """Render a star count compactly, e.g. 3842 -> "3.8k". ``None`` if unknown."""
+    if not isinstance(count, int) or count < 0:
+        return None
+    if count < 1000:
+        return str(count)
+    return f"{count / 1000:.1f}k"
+
+
+def _repo_meta(repo: dict) -> list[dict]:
+    """Build the template's meta row: a language dot and a star count."""
+    meta = []
+    lang = repo.get("language")
+    if lang:
+        meta.append({"text": lang, "dot": LANGUAGE_COLORS.get(lang, LANGUAGE_FALLBACK_COLOR)})
+    stars = _format_stars(repo.get("stargazers_count"))
+    if stars:
+        meta.append({"text": f"★ {stars}"})
+    return meta
+
+
 def repos_for_email(count: int = 20, day=None) -> list[dict]:
-    """Return the top repos as ``[{"title", "url", "description"}, ...]`` for the template."""
+    """Return the top repos as template items for the previous day.
+
+    Each item has ``title``, ``url``, ``description``, and a ``meta`` list
+    holding the language (with its dot colour) and the star count.
+    """
     items = []
     for repo in _extract_repos(fetch_top_repos(count, day)):
         if not isinstance(repo, dict):
@@ -85,6 +139,7 @@ def repos_for_email(count: int = 20, day=None) -> list[dict]:
                     "title": title,
                     "url": url,
                     "description": repo.get("description") or "",
+                    "meta": _repo_meta(repo),
                 }
             )
     return items
