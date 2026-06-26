@@ -7,3 +7,9 @@ dependencies = [
     "jinja2>=3.1.6",
     "resend>=2.32.2",
 ]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "RUF", "BLE"]
