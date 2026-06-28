@@ -1,10 +1,21 @@
 import json
 import os
+import random
 import urllib.parse
 import urllib.request
 
 # API Ninjas "Quotes" endpoint: https://api-ninjas.com/api/quotes
 API_NINJAS_QUOTES_URL = "https://api.api-ninjas.com/v1/quotes"
+
+ALLOWED_CATEGORIES = [
+    "leadership",
+    "time",
+    "courage",
+    "success",
+    "humor",
+    "inspirational",
+    "wisdom",
+]
 
 
 def _build_request(category: str | None = None) -> urllib.request.Request:
@@ -29,6 +40,13 @@ def fetch_quote(category: str | None = None):
     Returns the raw response (a list of quote objects). Safe to call from
     synchronous code such as ``send_email.py``.
     """
+    if category is None:
+        category = random.choice(ALLOWED_CATEGORIES)
+    elif category not in ALLOWED_CATEGORIES:
+        raise ValueError(
+            f"Category '{category}' is not allowed. Must be one of {ALLOWED_CATEGORIES}."
+        )
+
     with urllib.request.urlopen(_build_request(category), timeout=30) as resp:
         return json.load(resp)
 
