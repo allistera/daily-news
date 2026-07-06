@@ -118,7 +118,7 @@ def main() -> None:
         raise SystemExit("No content from any source; not sending an empty newsletter.")
 
     params: resend.Emails.SendParams = {
-        "from": "hey@infinitywave.online",
+        "from": "hey@allisterantosik.com",
         "to": ["allisteraall@gmail.com"],
         "subject": subject,
         "html": render_html(sections, quote, quote_author, date_line),
