@@ -1,0 +1,33 @@
+name: Weekly Newsletter
+
+on:
+  schedule:
+    # 05:00 UTC = 06:00 UK during BST (summer) and 05:00 UK during GMT (winter).
+    # Run every Monday at 05:00 UTC
+    - cron: '0 5 * * 1'
+  workflow_dispatch: {}        # Allow manual runs from the Actions tab
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install MCP servers
+        run: |
+          uv tool install product-hunt-mcp
+          echo "$(uv tool dir --bin)" >> "$GITHUB_PATH"
+
+      - name: Send weekly newsletter
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          PRODUCT_HUNT_TOKEN: ${{ secrets.PRODUCT_HUNT_TOKEN }}
+          API_NINJAS_KEY: ${{ secrets.API_NINJAS_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run send_weekly_email.py

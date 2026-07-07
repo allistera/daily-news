@@ -33,17 +33,22 @@ def previous_day():
     return datetime.now(UK).date() - timedelta(days=1)
 
 
-def _day_window(day):
-    """Return ``(after, before)`` UTC ISO bounds spanning the given UK calendar day."""
-    day_start = datetime.combine(day, time.min, tzinfo=UK)
-    day_end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=UK)
+def _window(day_or_window):
+    """Return ``(after, before)`` UTC ISO bounds spanning the given UK calendar day(s)."""
+    if isinstance(day_or_window, tuple):
+        start_day, end_day = day_or_window
+    else:
+        start_day = end_day = day_or_window
+        
+    day_start = datetime.combine(start_day, time.min, tzinfo=UK)
+    day_end = datetime.combine(end_day + timedelta(days=1), time.min, tzinfo=UK)
     after = day_start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     before = day_end.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     return after, before
 
 
 async def _fetch(count, day):
-    posted_after, posted_before = _day_window(day)
+    posted_after, posted_before = _window(day)
     async with _build_client() as client:
         result = await client.call_tool(
             "get_posts",

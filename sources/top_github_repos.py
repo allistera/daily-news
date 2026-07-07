@@ -41,10 +41,15 @@ def previous_day():
     return datetime.now(UK).date() - timedelta(days=1)
 
 
-def _day_window(day):
-    """Return ``(after, before)`` UTC ISO bounds spanning the given UK calendar day."""
-    day_start = datetime.combine(day, time.min, tzinfo=UK)
-    day_end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=UK)
+def _window(day_or_window):
+    """Return ``(after, before)`` UTC ISO bounds spanning the given UK calendar day(s)."""
+    if isinstance(day_or_window, tuple):
+        start_day, end_day = day_or_window
+    else:
+        start_day = end_day = day_or_window
+        
+    day_start = datetime.combine(start_day, time.min, tzinfo=UK)
+    day_end = datetime.combine(end_day + timedelta(days=1), time.min, tzinfo=UK)
     after = day_start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     before = day_end.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     return after, before
@@ -56,7 +61,7 @@ def fetch_top_repos(count: int = 20, day=None):
     Returns the raw GitHub search response. Safe to call from synchronous code
     such as ``send_email.py``.
     """
-    created_after, created_before = _day_window(day or previous_day())
+    created_after, created_before = _window(day or previous_day())
     query = f"created:{created_after}..{created_before}"
     with urllib.request.urlopen(_build_request(query, count), timeout=30) as resp:
         return json.load(resp)
